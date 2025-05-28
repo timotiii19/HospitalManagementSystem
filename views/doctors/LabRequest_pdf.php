@@ -1,6 +1,9 @@
 <?php
 session_start(); // Start session to access session variables
 
+date_default_timezone_set('Asia/Manila');
+
+
 require '../../dompdf/autoload.inc.php';
 use Dompdf\Dompdf;
 

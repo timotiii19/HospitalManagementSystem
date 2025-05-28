@@ -74,6 +74,11 @@ include('../../includes/admin_sidebar.php');
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+    <!-- Bootstrap CSS CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome for the PDF icon -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
 <title>Location Management - Map Layout</title>
 <link rel="stylesheet" href="../../css/style.css">
 <style>
@@ -262,6 +267,83 @@ include('../../includes/admin_sidebar.php');
 </style>
 </head>
 <body>
+<?php
+// Get current filter values from URL (GET)
+$type = isset($_GET['type']) ? $_GET['type'] : '';
+$capacity = isset($_GET['capacity']) ? $_GET['capacity'] : '';
+?>
+
+<!-- Floating Generate Report Button -->
+<button id="toggleFiltersBtn" 
+        style="
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        "
+        class="btn btn-danger"
+        title="Generate a report"
+>
+    <i class="fas fa-file-pdf"></i>
+</button>
+
+<!-- Floating Filters Panel (hidden by default) -->
+<form id="filtersForm" method="GET" action="location_report.php" target="_blank"
+      style="
+        position: fixed;
+        bottom: 90px;
+        right: 20px;
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        z-index: 1000;
+        display: none;
+        width: 250px;
+      "
+>
+    <!-- Room Type Filter -->
+    <select name="type" class="form-select mb-2">
+        <option value="">All Room Types</option>
+        <option value="Ward" <?= $type === 'Ward' ? 'selected' : '' ?>>Ward</option>
+        <option value="Semi-Private" <?= $type === 'Semi-Private' ? 'selected' : '' ?>>Semi-Private</option>
+        <option value="Private" <?= $type === 'Private' ? 'selected' : '' ?>>Private</option>
+    </select>
+
+    <!-- Capacity Filter -->
+    <select name="capacity" class="form-select mb-3">
+        <option value="">All Capacities</option>
+        <option value="1" <?= $capacity === '1' ? 'selected' : '' ?>>1</option>
+        <option value="2" <?= $capacity === '2' ? 'selected' : '' ?>>2</option>
+        <option value="3" <?= $capacity === '3' ? 'selected' : '' ?>>3</option>
+        <option value="4" <?= $capacity === '4' ? 'selected' : '' ?>>4</option>
+    </select>
+
+    <!-- Done Button -->
+    <button type="submit" class="btn btn-danger w-100">
+        <i class="fas fa-file-pdf"></i> Done
+    </button>
+</form>
+
+<script>
+    const toggleFiltersBtn = document.getElementById('toggleFiltersBtn');
+    const filtersForm = document.getElementById('filtersForm');
+
+    toggleFiltersBtn.addEventListener('click', () => {
+        if (filtersForm.style.display === 'block') {
+            filtersForm.style.display = 'none';
+        } else {
+            filtersForm.style.display = 'block';
+        }
+    });
+</script>
 
 <div class="content">
     <h2>Location Management</h2>
@@ -336,7 +418,7 @@ include('../../includes/admin_sidebar.php');
                     $capacity = $room['RoomCapacity'];
 
                     // Count occupied beds
-                    $sqlCount = "SELECT COUNT(*) as count FROM inpatients WHERE LocationID = $locationID";
+                    $sqlCount = "SELECT COUNT(*) as count FROM inpatients WHERE LocationID = $locationID AND DischargeDate IS NULL";
                     $resCount = $conn->query($sqlCount);
                     $count = $resCount->fetch_assoc()['count'];
 

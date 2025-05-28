@@ -2,7 +2,7 @@
 ob_start();
 session_start();
 
-$can_edit = false;
+$can_edit = true;  // or false depending on your permission logic
 
 if (!isset($_SESSION['username']) || $_SESSION['role'] != 'Admin') {
     header("Location: ../../auth/admin_login.php");
@@ -12,6 +12,7 @@ if (!isset($_SESSION['username']) || $_SESSION['role'] != 'Admin') {
 include('../../includes/admin_header.php');
 include('../../includes/admin_sidebar.php');
 include('../../config/db.php');
+include('../../auth/mailer.php'); // Your mail function
 
 // Get all users
 function getUsers($conn) {
@@ -20,108 +21,126 @@ function getUsers($conn) {
     return mysqli_fetch_all($result, MYSQLI_ASSOC);
 }
 
-// Handle Add User
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['username'])) {
-    $username = mysqli_real_escape_string($conn, $_POST['username']);
+// Handle Add User - NO username or password, send activation link instead
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['full_name']) && isset($_POST['email'])) {
     $full_name = mysqli_real_escape_string($conn, $_POST['full_name']);
     $email = mysqli_real_escape_string($conn, $_POST['email']);
-    $password = password_hash($_POST['password'], PASSWORD_BCRYPT);
     $role = mysqli_real_escape_string($conn, $_POST['role']);
     $contact = mysqli_real_escape_string($conn, $_POST['ContactNumber']);
 
-    $check_query = "SELECT * FROM users WHERE username = '$username' OR email = '$email'";
+    // Check if email already exists
+    $check_query = "SELECT * FROM users WHERE email = '$email'";
     $check_result = mysqli_query($conn, $check_query);
     if (mysqli_num_rows($check_result) > 0) {
-        $error_message = "Username or Email already exists!";
+        $error_message = "Email already exists!";
     } else {
-        $query = "INSERT INTO users (username, full_name, email, password, role, ContactNumber) 
-                  VALUES ('$username', '$full_name', '$email', '$password', '$role', '$contact')";
+        $token = bin2hex(random_bytes(16));
+          $expiry = date('Y-m-d H:i:s', strtotime('+1 day'));
+        $query = "INSERT INTO users (full_name, email, role, ContactNumber, token, token_expiry) 
+          VALUES ('$full_name', '$email', '$role', '$contact', '$token', '$expiry')";
         if (mysqli_query($conn, $query)) {
-            $last_user_id = mysqli_insert_id($conn);
+            $user_id = mysqli_insert_id($conn);
             switch ($role) {
                 case 'Doctor':
-                    $sql = "INSERT INTO doctor (UserID, DoctorName, Email) VALUES ('$last_user_id', '$full_name', '$email')";
+                    mysqli_query($conn, "INSERT INTO doctor (UserID, DoctorName, Email) VALUES ('$user_id', '$full_name', '$email')");
                     break;
                 case 'Nurse':
-                    $sql = "INSERT INTO nurse (UserID, Name, Email) VALUES ('$last_user_id', '$full_name', '$email')";
+                    mysqli_query($conn, "INSERT INTO nurse (UserID, Name, Email) VALUES ('$user_id', '$full_name', '$email')");
                     break;
                 case 'Pharmacist':
-                    $sql = "INSERT INTO pharmacist (UserID, Name, Email) VALUES ('$last_user_id', '$full_name', '$email')";
+                    mysqli_query($conn, "INSERT INTO pharmacist (UserID, Name, Email) VALUES ('$user_id', '$full_name', '$email')");
                     break;
                 case 'Cashier':
-                    $sql = "INSERT INTO cashier (UserID, Name) VALUES ('$last_user_id', '$full_name')";
+                    mysqli_query($conn, "INSERT INTO cashier (UserID, Name) VALUES ('$user_id', '$full_name')");
                     break;
                 case 'Admin':
                 default:
-                    $sql = "INSERT INTO admin (UserID) VALUES ('$last_user_id')";
+                    mysqli_query($conn, "INSERT INTO admin (UserID) VALUES ('$user_id')");
                     break;
             }
-            if (isset($sql)) mysqli_query($conn, $sql);
-            header("Location: employees.php");
-            exit();
-        } else {
-            $error_message = "Error: " . mysqli_error($conn);
-        }
-    }
+            // Send activation email
+            // Prepare activation link URL (replace localhost with your real domain when deploying)
+            $link = "http://localhost/HMS-main/auth/complete_registration.php?token=$token";
+
+            $subject = "Set up your account";
+
+            $message = "
+            Hi $full_name,
+            Please click the button below to set up your account:
+            $link Set Up Your Account
+            Or copy and paste the following URL into your browser:
+            $link 
+            $link
+            Thank you!
+            ";
+
+            $headers = "MIME-Version: 1.0" . "\r\n";
+            $headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
+            $headers .= 'From: Your Company <no-reply@yourdomain.com>' . "\r\n";
+
+            mail($email, $subject, $message, $headers);
+
+
+           if (sendMail($email, $subject, $message)) {
+                $_SESSION['success_message'] = "User added and activation email sent successfully!";
+                header("Location: employees.php");
+                exit();
+            } else {
+                $error_message = "User added, but failed to send activation email.";
+            }
+
+                }
+            }
 }
 
-// Handle Update User
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_user'])) {
-    $user_id = mysqli_real_escape_string($conn, $_POST['edit_user_id']);
-    $username = mysqli_real_escape_string($conn, $_POST['edit_username']);
-    $full_name = mysqli_real_escape_string($conn, $_POST['edit_full_name']);
-    $email = mysqli_real_escape_string($conn, $_POST['edit_email']);
-    $role = mysqli_real_escape_string($conn, $_POST['edit_role']);
-    $contact = mysqli_real_escape_string($conn, $_POST['edit_ContactNumber']);
+// Handle delete request
+if (isset($_GET['delete'])) {
+    $delete_id = intval($_GET['delete']);
 
-    $query = "UPDATE users SET username='$username', full_name='$full_name', email='$email', role='$role', ContactNumber='$contact' WHERE UserID='$user_id'";
-    mysqli_query($conn, $query);
+    // Optional: Delete from role-specific table first
+    $role_result = mysqli_query($conn, "SELECT role FROM users WHERE UserID = $delete_id");
+    if ($role_result && mysqli_num_rows($role_result) > 0) {
+        $role_row = mysqli_fetch_assoc($role_result);
+        $role = $role_row['role'];
+
+        switch ($role) {
+            case 'Doctor':
+                mysqli_query($conn, "DELETE FROM doctor WHERE UserID = $delete_id");
+                break;
+            case 'Nurse':
+                mysqli_query($conn, "DELETE FROM nurse WHERE UserID = $delete_id");
+                break;
+            case 'Pharmacist':
+                mysqli_query($conn, "DELETE FROM pharmacist WHERE UserID = $delete_id");
+                break;
+            case 'Cashier':
+                mysqli_query($conn, "DELETE FROM cashier WHERE UserID = $delete_id");
+                break;
+            case 'Admin':
+                mysqli_query($conn, "DELETE FROM admin WHERE UserID = $delete_id");
+                break;
+        }
+    }
+
+    // Now delete from main users table
+    mysqli_query($conn, "DELETE FROM users WHERE UserID = $delete_id");
+
+    // Redirect to prevent resubmission on page refresh
     header("Location: employees.php");
     exit();
 }
 
-// Handle Delete User
-if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
-    $user_id = $_GET['delete'];
-    $role_query = "SELECT role FROM users WHERE UserID = '$user_id'";
-    $role_result = mysqli_query($conn, $role_query);
-    if (mysqli_num_rows($role_result) > 0) {
-        $role = mysqli_fetch_assoc($role_result)['role'];
-        switch ($role) {
-            case 'Doctor':
-                mysqli_query($conn, "DELETE FROM doctor WHERE UserID = '$user_id'");
-                break;
-            case 'Nurse':
-                mysqli_query($conn, "DELETE FROM nurse WHERE UserID = '$user_id'");
-                break;
-            case 'Pharmacist':
-                mysqli_query($conn, "DELETE FROM pharmacist WHERE UserID = '$user_id'");
-                break;
-            case 'Cashier':
-                mysqli_query($conn, "DELETE FROM cashier WHERE UserID = '$user_id'");
-                break;
-            case 'Admin':
-                mysqli_query($conn, "DELETE FROM admin WHERE UserID = '$user_id'");
-                break;
-        }
-        mysqli_query($conn, "DELETE FROM users WHERE UserID = '$user_id'");
-        header("Location: employees.php");
-        exit();
-    }
-}
 
 $users = getUsers($conn);
 ?>
 
-
-<!-- HTML Output -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Employee Management</title>
     <link rel="stylesheet" href="../../css/style.css" />
-     <style>
+    <style>
             
          body {
             font-family: Arial, sans-serif;
@@ -135,21 +154,59 @@ $users = getUsers($conn);
         }
 
         /* Left column (list) takes the remaining width minus the fixed right column */
-        .left-column {
-            flex: 1 1 auto;
-            margin-right: 320px; /* Reserve space for fixed right column */
-        }
+       .left-column {
+    flex: 1 1 auto;
+    margin-right: 320px; /* reserve space */
+}
+
         .right-column {
             position: fixed;
             right: 10px; /* distance from right edge */
-            top: 100px;   /* distance from top (adjust if you have a header) */
+            top: 80px;   /* distance from top (adjust if you have a header) */
             width: 300px;
             background: rgb(226, 136, 173);
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 0 8px rgba(0,0,0,0.1);
             height: auto;
+            
         }
+
+        .right-column label {
+            display: block;       /* Make labels appear on their own line */
+            margin-bottom: 5px;   /* Space below label */
+            font-weight: 600;
+            }
+
+.right-column input,
+.right-column select,
+.right-column textarea,
+.right-column button {
+  width: 100%;          /* Make inputs full width inside the container */
+  padding: 8px 10px;    /* Some padding for comfort */
+  margin-bottom: 15px;  /* Space below each input/select */
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+        td:nth-child(4),
+        th:nth-child(4) {
+            max-width: 200px;
+            word-break: break-word;
+            white-space: normal;
+        }
+
+.right-column button {
+  background-color:rgb(232, 157, 188);  /* Your pink shade */
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.right-column button:hover {
+  background-color: #eb5191;  /* Slightly darker on hover */
+}
 
 .right-column::before {
     content: "";
@@ -308,7 +365,37 @@ button.view-btn:hover {
     background-color: #512da8;
 }
 
-        
+        #filterModal {
+            position: fixed;
+            bottom: 25px;
+            right: 20px;
+            background: #fff;
+            border: 1px solid #ccc;
+            padding: 20px 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10000;
+            font-family: Arial, sans-serif;
+            width: 250px;
+        }
+
+        #filterModal select {
+            width: 100%;
+            margin-top: 10px;
+            padding: 8px 10px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background: #fafafa;
+            cursor: pointer;
+        }
+
+        #filterModal label {
+            font-weight: 600;
+            font-size: 14px;
+            color: #333;
+        }
+
     </style>
 </head>
 <body>
@@ -332,15 +419,15 @@ button.view-btn:hover {
                     <td><?= htmlspecialchars($user['ContactNumber'] ?? '') ?></td>
                     <td><?= ucfirst(htmlspecialchars($user['role'])) ?></td>
                     <td>
-                         <?php if ($can_edit): ?>
+                        <?php if ($can_edit): ?>
                         <a href="javascript:void(0);" class="edit-btn"
                            data-id="<?= $user['UserID'] ?>"
                            data-username="<?= htmlspecialchars($user['username']) ?>"
                            data-full_name="<?= htmlspecialchars($user['full_name']) ?>"
                            data-email="<?= htmlspecialchars($user['email']) ?>"
                            data-contact="<?= htmlspecialchars($user['ContactNumber']) ?>"
-                           data-role="<?= htmlspecialchars($user['role']) ?>">Edit</a> |
-                            <?php endif; ?>
+                           data-role="<?= htmlspecialchars($user['role']) ?>" ></a> 
+                        <?php endif; ?>
                         <a href="employees.php?delete=<?= $user['UserID'] ?>" onclick="return confirm('Delete this user?');" class="delete-link">Delete</a>
                     </td>
                 </tr>
@@ -353,9 +440,7 @@ button.view-btn:hover {
         <h2>Add Employee</h2>
         <div class="form-container">
             <form method="POST" action="employees.php">
-                <label for="username">Username</label>
-                <input type="text" name="username" required>
-
+                <!-- Removed Username and Password inputs -->
                 <label for="full_name">Full Name</label>
                 <input type="text" name="full_name" required>
 
@@ -364,9 +449,6 @@ button.view-btn:hover {
 
                 <label for="ContactNumber">Contact Number</label>
                 <input type="text" name="ContactNumber" required>
-
-                <label for="password">Password</label>
-                <input type="password" name="password" required>
 
                 <label for="role">Role</label>
                 <select name="role" required>
@@ -382,9 +464,6 @@ button.view-btn:hover {
             </form>
             <?php if (isset($error_message)) echo "<p style='color:red;'>$error_message</p>"; ?>
 
-            <div id="pdf-button-container" style="position:fixed; bottom:20px; right:120px;">
-                <button onclick="document.getElementById('filterModal').style.display='block'" class="btn btn-primary">Generate PDF</button>
-            </div>
         </div>
     </div>
 </div>
@@ -416,10 +495,45 @@ button.view-btn:hover {
     </form>
 </div>
 
-<div id="filterModal" style="display:none; position:fixed; bottom:70px; right:20px; background:#fff; border:1px solid #ccc; padding:10px; z-index:10000;">
-    <form method="POST" action="generate_user_pdf.php">
-        <label for="role">Filter Role:</label>
-        <select name="role">
+<!-- PDF Button Container -->
+<div id="pdf-button-container" style="position:fixed; bottom:180px; right:120px;">
+    <button id="filterToggleBtn" class="btn btn-primary" style="
+        padding: 10px 15px;
+        background-color: #e888ad;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-weight: bold;
+    ">Generate PDF</button>
+</div>
+
+<!-- Filter PDF Modal -->
+<div id="filterModal" style="
+    display: none;
+    position: fixed;
+    bottom: 0px;
+    right: 30px;
+    background: #fff;
+    border: 1px solid #ccc;
+    padding: 20px 25px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 10000;
+    font-family: Arial, sans-serif;
+    width: 250px;
+">
+    <form method="POST" action="generate_user_pdf.php" style="display: flex; flex-direction: column; gap: 15px;">
+        <label for="role" style="font-weight: 600; font-size: 14px; color: #333;">Filter Role:</label>
+        <select name="role" id="role" style="
+            padding: 8px 10px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background: #fafafa;
+            cursor: pointer;
+            transition: border-color 0.3s ease;
+        " onfocus="this.style.borderColor='#e888ad'" onblur="this.style.borderColor='#ccc'">
             <option value="all">All</option>
             <option value="Doctor">Doctor</option>
             <option value="Nurse">Nurse</option>
@@ -427,9 +541,37 @@ button.view-btn:hover {
             <option value="Admin">Admin</option>
             <option value="Cashier">Cashier</option>
         </select>
-        <button type="submit">Generate PDF</button>
+        <button type="submit" style="
+            padding: 10px;
+            background-color: #e888ad;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        " onmouseover="this.style.backgroundColor='#d46e92'" onmouseout="this.style.backgroundColor='#e888ad'">
+            Generate PDF
+        </button>
     </form>
 </div>
+
+<!-- Toggle Modal Script -->
+<script>
+    const toggleBtn = document.getElementById('filterToggleBtn');
+    const filterModal = document.getElementById('filterModal');
+
+    toggleBtn.addEventListener('click', () => {
+        if (filterModal.style.display === 'none' || filterModal.style.display === '') {
+            filterModal.style.display = 'block';
+        } else {
+            filterModal.style.display = 'none';
+        }
+    });
+</script>
+
+
 
 <script>
 document.querySelectorAll('.edit-btn').forEach(btn => {
@@ -447,4 +589,5 @@ document.querySelectorAll('.edit-btn').forEach(btn => {
 
 </body>
 </html>
+
 <?php ob_end_flush(); ?>

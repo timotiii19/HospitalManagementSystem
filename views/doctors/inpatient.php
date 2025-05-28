@@ -143,11 +143,13 @@ if ($result && $result->num_rows > 0) {
 }
 
 $inpatients = $conn->query("
-    SELECT i.*, l.LocationName 
+    SELECT i.*, l.LocationName, p.Name
     FROM inpatients i
     LEFT JOIN locations l ON i.LocationID = l.LocationID
+    LEFT JOIN patients p ON i.PatientID = p.PatientID
     ORDER BY i.AdmissionDate DESC
 ");
+
 
 
 $locationsSql = "
@@ -295,7 +297,7 @@ body {
     <thead>
         <tr>
             <th>InpatientID</th>
-            <th>PatientID</th>
+            <th>Patient Name</th>
             <th>AdmissionDate</th>
             <th>DischargeDate</th>
             <th>MedicalRecord</th>
@@ -307,7 +309,7 @@ body {
     <?php while ($row = $inpatients->fetch_assoc()): ?>
         <tr data-inpatientid="<?= htmlspecialchars($row['InpatientID']) ?>">
             <td><?= htmlspecialchars($row['InpatientID']) ?></td>
-            <td><?= htmlspecialchars($row['PatientID']) ?></td>
+            <td><?= htmlspecialchars($row['Name']) ?></td>
             <td><?= htmlspecialchars($row['AdmissionDate']) ?></td>
             <td class="discharge-cell" data-inpatientid="<?= htmlspecialchars($row['InpatientID']) ?>">
                 <?php if ($row['DischargeDate']): ?>

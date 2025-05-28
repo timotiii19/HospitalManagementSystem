@@ -1,3 +1,58 @@
+<?php
+session_start();
+include('../config/db.php');    // Your DB connection
+include('../auth/mailer.php');  // Your mail helper
+
+$message = "";
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $email = $_POST['email'] ?? '';
+    $role = $_POST['role'] ?? '';
+
+    // Basic validation
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $message = "Invalid email address.";
+    } elseif (empty($role)) {
+        $message = "Please select a role.";
+    } else {
+        // Check if user exists with given email and role
+        $stmt = $conn->prepare("SELECT UserID FROM users WHERE email = ? AND role = ?");
+        $stmt->bind_param("ss", $email, $role);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        if ($result->num_rows === 1) {
+            // User found, generate token
+            $token = bin2hex(random_bytes(16)); // 32 chars
+            $expires_at = date("Y-m-d H:i:s", strtotime('+1 hour'));
+
+            // Insert or update password_resets
+            $stmt2 = $conn->prepare("REPLACE INTO password_resets (email, token, expires_at) VALUES (?, ?, ?)");
+            $stmt2->bind_param("sss", $email, $token, $expires_at);
+            $stmt2->execute();
+
+            // Prepare reset link
+            $reset_link = "http://localhost/HMS-main/auth/reset_password.php?token=" . $token;
+
+            // Compose email
+            $subject = "Password Reset Request";
+            $body = "Hi,\n\nClick the following link to reset your password:\n$reset_link\n\nThis link expires in 1 hour.\n\nIf you did not request this, please ignore this email.";
+
+            // Send email using your mailer helper function
+            $mail_sent = sendMail($email, $subject, $body);
+
+            if ($mail_sent) {
+                $message = "Password reset link has been sent to your email.";
+            } else {
+                $message = "Failed to send reset email. Please try again later.";
+            }
+        } else {
+            $message = "No user found with that email and role.";
+        }
+    }
+}
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
