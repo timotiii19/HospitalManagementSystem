@@ -162,7 +162,7 @@ $users = getUsers($conn);
         .right-column {
             position: fixed;
             right: 10px; /* distance from right edge */
-            top: 80px;   /* distance from top (adjust if you have a header) */
+            top: 90px;   /* distance from top (adjust if you have a header) */
             width: 300px;
             background: rgb(226, 136, 173);
             padding: 20px;
@@ -256,7 +256,7 @@ tr:hover {
 
 .right-column h2 {
     margin-top: 0px;
-    margin-bottom: 0px;
+    margin-bottom: 15px;
 }
 
 .delete-link {
@@ -496,7 +496,7 @@ button.view-btn:hover {
 </div>
 
 <!-- PDF Button Container -->
-<div id="pdf-button-container" style="position:fixed; bottom:180px; right:120px;">
+<div id="pdf-button-container" style="position:fixed; bottom:160px; right:120px;">
     <button id="filterToggleBtn" class="btn btn-primary" style="
         padding: 10px 15px;
         background-color: #e888ad;
@@ -512,11 +512,11 @@ button.view-btn:hover {
 <div id="filterModal" style="
     display: none;
     position: fixed;
-    bottom: 0px;
+    bottom: 5px;
     right: 30px;
     background: #fff;
     border: 1px solid #ccc;
-    padding: 20px 25px;
+    padding: 10px 15px;
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     z-index: 10000;

@@ -21,9 +21,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update'])) {
     $department_id = $_POST['DepartmentID'];
     $doctor_type = $_POST['DoctorType'];
     $doctor_fee = $_POST['DoctorFee'];
+    $availability = $_POST['Availability'];
 
-    $stmt = $conn->prepare("UPDATE doctor SET DepartmentID=?, DoctorType=?, DoctorFee=? WHERE DoctorID=?");
-    $stmt->bind_param("sssi", $department_id, $doctor_type, $doctor_fee, $doctor_id);
+    $stmt = $conn->prepare("UPDATE doctor SET DepartmentID=?, DoctorType=?, DoctorFee=?, Availability=? WHERE DoctorID=?");
+    $stmt->bind_param("ssdsi", $department_id, $doctor_type, $doctor_fee, $availability, $doctor_id);
     $stmt->execute();
     $stmt->close();
 
@@ -87,10 +88,14 @@ if (isset($_GET['delete'])) {
                     <td><?= htmlspecialchars($row['DoctorFee']) ?></td>
                     <td>
                         <a href="#" class="edit-btn" 
-                           data-id="<?= $row['DoctorID'] ?>" 
-                           data-dept="<?= $row['DepartmentID'] ?>" 
-                           data-type="<?= htmlspecialchars($row['DoctorType']) ?>" 
-                           data-fee="<?= htmlspecialchars($row['DoctorFee']) ?>">Edit</a> |
+                        data-id="<?= $row['DoctorID'] ?>" 
+                        data-dept="<?= $row['DepartmentID'] ?>" 
+                        data-type="<?= htmlspecialchars($row['DoctorType']) ?>" 
+                        data-fee="<?= htmlspecialchars($row['DoctorFee']) ?>" 
+                        data-availability="<?= htmlspecialchars($row['Availability'] ?? '') ?>">
+                        Edit
+                        </a>        
+ |
                         <a href="doctors.php?delete=<?= $row['DoctorID'] ?>" 
                            onclick="return confirm('Are you sure?');" 
                            class="delete-link">Delete</a>
@@ -123,6 +128,10 @@ if (isset($_GET['delete'])) {
 
             <label for="DoctorFee">Doctor Fee</label>
             <input type="number" name="DoctorFee" id="editDoctorFee" required><br><br>
+
+            <label for="Availability">Availability</label>
+            <input type="text" name="Availability" id="editAvailability" required><br><br>
+
 
             <button type="submit" name="update">Update</button>
         </form>
@@ -227,6 +236,7 @@ document.querySelectorAll('.edit-btn').forEach(button => {
         document.getElementById('editDepartmentID').value = this.dataset.dept;
         document.getElementById('editDoctorType').value = this.dataset.type;
         document.getElementById('editDoctorFee').value = this.dataset.fee;
+        document.getElementById('editAvailability').value = this.dataset.availability;
         document.getElementById('editModal').style.display = 'flex';
     });
 });
