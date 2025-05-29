@@ -59,10 +59,10 @@ $schedules = $result->fetch_all(MYSQLI_ASSOC);
             text-decoration: none;
             cursor: pointer;
         }
-        .btn-warning { background-color: #ffc107; color: white; }
-        .btn-warning:hover { background-color: #e0a800; }
-        .btn-success { background-color: #28a745; color: white; }
-        .btn-success:hover { background-color: #218838; }
+        .btn-warning { background-color:rgb(224, 84, 98); color: white; }
+        .btn-warning:hover { background-color:rgb(237, 87, 89); }
+        .btn-success { background-color:rgb(223, 75, 93); color: white; }
+        .btn-success:hover { background-color:rgb(239, 70, 104); }
 
         table {
             width: 100%;
