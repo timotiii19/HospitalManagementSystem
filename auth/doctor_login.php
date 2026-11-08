@@ -1,40 +1,23 @@
 <?php
 session_start();
 include('../config/db.php');
+require_once __DIR__ . '/authenticate.php';
 $error = "";
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $email = $_POST['email'];
-    $password = $_POST['password'];
-    $sql = "SELECT * FROM users WHERE email = '$email' AND role = 'Doctor'";
-    $result = $conn->query($sql);
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $user = authenticateStaffUser(
+        $conn,
+        $_POST['email'] ?? '',
+        $_POST['password'] ?? '',
+        'Doctor'
+    );
 
-    if ($result && $result->num_rows == 1) {
-        $user = $result->fetch_assoc();
-        $passwordMatch = password_verify($password, $user['password']) || $password === $user['password'];
-
-        if ($passwordMatch) {
-            // ✅ Set all needed session values
-            $_SESSION['username'] = $user['username'];
-            $_SESSION['full_name'] = $user['full_name']; // ✅ Must be real name
-            $_SESSION['role'] = $user['role'];
-            $_SESSION['UserID'] = $user['UserID']; // Use consistent key: UserID (not user_id)
-
-            // Get doctor-specific role ID
-            $roleQuery = "SELECT DoctorID AS role_id FROM doctor WHERE UserID = {$user['UserID']}";
-            $roleResult = $conn->query($roleQuery);
-            if ($roleResult && $roleResult->num_rows == 1) {
-                $_SESSION['role_id'] = $roleResult->fetch_assoc()['role_id'];
-            }
-
-            header("Location: ../views/doctors/dashboard.php");
-            exit();
-        } else {
-            $error = "Invalid credentials!";
-        }
-    } else {
-        $error = "No Doctor found with those credentials!";
+    if ($user) {
+        header('Location: ' . $user['redirect']);
+        exit();
     }
+
+    $error = 'Invalid email or password.';
 }
 ?>
 
@@ -42,7 +25,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Doctor Login</title>
+    <link rel="stylesheet" href="../css/style.css">
     <style>
         body {
             position: relative;

@@ -1,94 +1,23 @@
 <?php
 session_start();
 include('../config/db.php');
+require_once __DIR__ . '/authenticate.php';
 
 $error = "";
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    if (isset($_POST['email']) && isset($_POST['password'])) {
-        $email = $_POST['email'];
-        $password = $_POST['password'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $user = authenticateStaffUser(
+        $conn,
+        $_POST['email'] ?? '',
+        $_POST['password'] ?? ''
+    );
 
-        $sql = "SELECT * FROM users WHERE email = '$email'";
-        $result = $conn->query($sql);
-
-        if ($result && $result->num_rows == 1) {
-            $user = $result->fetch_assoc();
-
-            if (password_get_info($user['password'])['algo'] == 0) {
-                $passwordMatch = ($password === $user['password']);
-            } else {
-                $passwordMatch = password_verify($password, $user['password']);
-            }
-
-            if ($passwordMatch) {
-                $_SESSION['username'] = $user['username'];
-                $_SESSION['role'] = $user['role'];
-                $_SESSION['user_id'] = $user['UserID'];
-
-            switch ($user['role']) {
-                case 'admin':
-                    $query = "SELECT AdminID AS role_id FROM admin WHERE UserID = {$user['UserID']}";
-                    break;
-                case 'doctor':
-                    $query = "SELECT DoctorID AS role_id FROM doctor WHERE UserID = {$user['UserID']}";
-                    break;
-                case 'nurse':
-                    $query = "SELECT NurseID AS role_id FROM nurse WHERE UserID = {$user['UserID']}";
-                    break;
-                case 'cashier':
-                    $query = "SELECT CashierID AS role_id FROM cashier WHERE UserID = {$user['UserID']}";
-                    break;
-                case 'pharmacist':
-                    $query = "SELECT PharmacistID AS role_id FROM pharmacist WHERE UserID = {$user['UserID']}";
-                    break;
-                case 'receptionist':
-                    $query = "SELECT ReceptionistID AS role_id FROM receptionist WHERE UserID = {$user['UserID']}";
-                    break;
-                default:
-                    $query = "";
-            }
-
-
-            if (!empty($query)) {
-                $roleResult = $conn->query($query);
-                if ($roleResult && $roleResult->num_rows == 1) {
-                    $roleData = $roleResult->fetch_assoc();
-                    $_SESSION['role_id'] = $roleData['role_id'];
-                }
-            }
-
-                // ⭐ Redirect based on role ⭐
-                switch ($_SESSION['role']) {
-                    case 'admin':
-                        header("Location: ../views/admin/dashboard.php");
-                        break;
-                    case 'doctor':
-                        header("Location: ../views/doctors/dashboard.php");
-                        break;
-                    case 'nurse':
-                        header("Location: ../views/nurse/dashboard.php");
-                        break;
-                    case 'cashier':
-                        header("Location: ../views/cashier/dashboard.php");
-                        break;
-                    case 'pharmacist':
-                        header("Location: ../views/pharmacist/dashboard.php");
-                        break;
-                    default:
-                        header("Location: ../views/admin/dashboard.php");
-                        break;
-                }
-                exit();
-            } else {
-                $error = "Invalid email or password!";
-            }
-        } else {
-            $error = "Invalid email or password!";
-        }
-    } else {
-        $error = "Please fill in both fields!";
+    if ($user) {
+        header('Location: ' . $user['redirect']);
+        exit();
     }
+
+    $error = 'Invalid email or password.';
 }
 ?>
 

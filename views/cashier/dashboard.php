@@ -95,17 +95,17 @@ $cashier_name = $_SESSION['username'];
     <p>This is your cashier dashboard. Use the cards below to manage your tasks.</p>
 
     <div class="dashboard-cards">
-        <a href="/HMS-main/views/cashier/doctor.php" class="card">
+        <a href="<?= APP_BASE_URL ?>/views/cashier/doctor.php" class="card">
             <i class="fas fa-user-md"></i>  <!-- matched icon for Doctor -->
             <div class="card-title">Doctor</div>
         </a>
 
-        <a href="/HMS-main/views/cashier/patient_billing.php" class="card">
+        <a href="<?= APP_BASE_URL ?>/views/cashier/patient_billing.php" class="card">
             <i class="fas fa-file-invoice-dollar"></i> <!-- matched icon for Billing -->
             <div class="card-title">Patient Billing</div>
         </a>
 
-        <a href="/HMS-main/views/cashier/pharmacy.php" class="card">
+        <a href="<?= APP_BASE_URL ?>/views/cashier/pharmacy.php" class="card">
             <i class="fas fa-pills"></i> <!-- matched icon for Pharmacy -->
             <div class="card-title">Pharmacy</div>
         </a>

@@ -1,46 +1,23 @@
 <?php
 session_start();
 include('../config/db.php');
+require_once __DIR__ . '/authenticate.php';
 $error = "";
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $email = $_POST['email'];
-    $password = $_POST['password'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $user = authenticateStaffUser(
+        $conn,
+        $_POST['email'] ?? '',
+        $_POST['password'] ?? '',
+        'Nurse'
+    );
 
-    // Use prepared statement to prevent SQL injection
-    $stmt = $conn->prepare("SELECT * FROM users WHERE email = ? AND role = 'Nurse'");
-    $stmt->bind_param("s", $email);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
-    if ($result && $result->num_rows == 1) {
-        $user = $result->fetch_assoc();
-
-        // Check hashed password only (secure way)
-        if (password_verify($password, $user['password']) || $password === $user['password']) {
-            $_SESSION['username'] = $user['username'];
-            $_SESSION['role'] = $user['role'];
-            $_SESSION['UserID'] = $user['UserID'];
-
-            // Fetch NurseID from nurse table
-            $roleQuery = "SELECT NurseID AS role_id FROM nurse WHERE UserID = ?";
-            $roleStmt = $conn->prepare($roleQuery);
-            $roleStmt->bind_param("i", $user['UserID']);
-            $roleStmt->execute();
-            $roleResult = $roleStmt->get_result();
-
-            if ($roleResult && $roleResult->num_rows == 1) {
-                $_SESSION['role_id'] = $roleResult->fetch_assoc()['role_id'];
-            }
-
-            header("Location: ../views/nurse/dashboard.php");
-            exit();
-        } else {
-            $error = "Invalid email or password.";
-        }
-    } else {
-        $error = "Invalid email or password.";
+    if ($user) {
+        header('Location: ' . $user['redirect']);
+        exit();
     }
+
+    $error = 'Invalid email or password.';
 }
 ?>
 
@@ -48,7 +25,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nurse Login</title>
+    <link rel="stylesheet" href="../css/style.css">
     <style>
         body {
             position: relative;

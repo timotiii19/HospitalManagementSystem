@@ -1,45 +1,23 @@
 <?php
 session_start();
 include('../config/db.php');
+require_once __DIR__ . '/authenticate.php';
 $error = "";
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $email = $_POST['email'];
-    $password = $_POST['password'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $user = authenticateStaffUser(
+        $conn,
+        $_POST['email'] ?? '',
+        $_POST['password'] ?? '',
+        'Admin'
+    );
 
-    // Prepared statement to avoid SQL injection
-    $sql = "SELECT * FROM users WHERE email = ? AND role = 'Admin'";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("s", $email);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
-    if ($result && $result->num_rows == 1) {
-        $user = $result->fetch_assoc();
-
-        // Verify password
-        $passwordMatch = password_verify($password, $user['password']) || $password === $user['password'];
-
-        if ($passwordMatch) {
-            $_SESSION['UserID'] = $user['UserID'];
-            $_SESSION['role'] = $user['role'];
-            $_SESSION['full_name'] = $user['full_name'];
-            $_SESSION['username'] = $user['username'];
-
-            $roleQuery = "SELECT AdminID AS role_id FROM admin WHERE UserID = {$user['UserID']}";
-            $roleResult = $conn->query($roleQuery);
-            if ($roleResult && $roleResult->num_rows == 1) {
-                $_SESSION['role_id'] = $roleResult->fetch_assoc()['role_id'];
-            }
-
-            header("Location: ../views/admin/dashboard.php");
-            exit();
-        } else {
-            $error = "Invalid credentials!";
-        }
-    } else {
-        $error = "No Admin found with those credentials!";
+    if ($user) {
+        header('Location: ' . $user['redirect']);
+        exit();
     }
+
+    $error = 'Invalid email or password.';
 }
 ?>
 
@@ -47,7 +25,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Login</title>
+    <link rel="stylesheet" href="../css/style.css">
     <style>
         body {
             position: relative;

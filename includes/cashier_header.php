@@ -4,8 +4,12 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Include database connection - absolute path
-include_once $_SERVER['DOCUMENT_ROOT'] . '/HMS-main/config/db.php';
+require_once __DIR__ . '/../config/db.php';
+
+if (!isset($_SESSION['UserID'], $_SESSION['role']) || $_SESSION['role'] !== 'Cashier') {
+    header('Location: ' . APP_BASE_URL . '/auth/cashier_login.php');
+    exit();
+}
 
 // Initialize user info array
 $user = [
@@ -48,6 +52,7 @@ if (isset($_SESSION['UserID'])) {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Doctor Header</title>
+  <link rel="stylesheet" href="<?= APP_BASE_URL ?>/css/style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <style>
     /* Same styling as Admin header */
@@ -242,19 +247,19 @@ if (isset($_SESSION['UserID'])) {
     }
   </style>
 </head>
-<body>
+<body class="role-app">
   <div class="header">
     <div class="left-section">
-      <img src="/HMS-main/images/hosplogo.png" alt="Logo" class="logo" />
+      <img src="<?= APP_BASE_URL ?>/images/hosplogo.png" alt="Logo" class="logo" />
 
       <div class="dropdown">
         <button class="dropbtn">
           Actions <i class="fas fa-chevron-down"></i>
         </button>
         <div class="dropdown-content">
-          <a href="/HMS-main/views/doctor/appointments.php">My Appointments</a>
-          <a href="/HMS-main/views/doctor/patients.php">My Patients</a>
-          <a href="/HMS-main/views/doctor/schedule.php">Schedule</a>
+          <a href="<?= APP_BASE_URL ?>/views/cashier/doctor.php">Doctors</a>
+          <a href="<?= APP_BASE_URL ?>/views/cashier/patient_billing.php">Patient Billing</a>
+          <a href="<?= APP_BASE_URL ?>/views/cashier/pharmacy.php">Pharmacy</a>
         </div>
       </div>
     </div>
@@ -265,7 +270,7 @@ if (isset($_SESSION['UserID'])) {
     </div>
 
     <div class="right-section">
-      <img src="/HMS-main/images/profile1.png" alt="Avatar" class="avatar" />
+      <img src="<?= APP_BASE_URL ?>/images/profile1.png" alt="Avatar" class="avatar" />
       <div class="user-dropdown" id="userDropdownToggle">
         <span>
           <?php
@@ -279,7 +284,7 @@ if (isset($_SESSION['UserID'])) {
         </span>
         <div class="dropdown-content" id="userDropdownMenu">
           <button id="openProfileBtn" type="button">My Profile</button>
-          <a href="/HMS-main/auth/logout.php">Logout</a>
+          <a href="<?= APP_BASE_URL ?>/auth/logout.php">Logout</a>
         </div>
       </div>
     </div>
@@ -322,7 +327,7 @@ if (isset($_SESSION['UserID'])) {
         alert('Please enter a search term');
         return;
       }
-      window.location.href = `/HMS-main/views/doctor/search.php?query=${encodeURIComponent(query)}`;
+      window.location.href = `<?= APP_BASE_URL ?>/views/search.php?query=${encodeURIComponent(query)}`;
     }
 
     searchInput.addEventListener('keypress', function (e) {
@@ -374,7 +379,7 @@ if (isset($_SESSION['UserID'])) {
 
       const formData = new FormData(profileForm);
 
-      fetch('/HMS-main/includes/update_profile.php', {
+      fetch('<?= APP_BASE_URL ?>/includes/update_profile.php', {
         method: 'POST',
         body: formData
       })

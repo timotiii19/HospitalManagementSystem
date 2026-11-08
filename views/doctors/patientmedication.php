@@ -1,10 +1,16 @@
 <?php
 session_start();
 
-include('../../includes/doctor_header.php');
-include('../../includes/doctor_sidebar.php');
 include('../../config/db.php');
 
+$doctor_id = (int) ($_SESSION['role_id'] ?? 0);
+if ($doctor_id <= 0) {
+    header('Location: ../../auth/doctor_login.php');
+    exit();
+}
+
+include('../../includes/doctor_header.php');
+include('../../includes/doctor_sidebar.php');
 
 $medications = [];
 
@@ -13,7 +19,6 @@ if ($conn->connect_error) {
 }
 
 // Fetch medications
-$doctor_id = $_SESSION['doctor_id'];
 $query = "SELECT * FROM patientmedication WHERE DoctorID = ?";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $doctor_id);
@@ -96,7 +101,7 @@ while ($row = $medications_result->fetch_assoc()) {
                         <input type="number" name="MedicineID" class="form-control" placeholder="Medicine ID" required>
                     </div>
                     <div class="col-md-2">
-                        <input type="number" name="DoctorID" class="form-control" value="<?= $_SESSION['doctor_id'] ?>" readonly>
+                        <input type="number" name="DoctorID" class="form-control" value="<?= $doctor_id ?>" readonly>
                     </div>
                     <div class="col-md-2">
                         <input type="text" name="Dosage" class="form-control" placeholder="Dosage" required>

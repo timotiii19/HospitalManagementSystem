@@ -1,74 +1,66 @@
 <?php
-include('../config/db.php');
+require_once __DIR__ . '/../config/db.php';
 
-if (!isset($_GET['token'])) {
-    die("Invalid token");
+$token = trim($_GET['token'] ?? '');
+$error = '';
+$complete = false;
+$userId = 0;
+
+if ($token === '') {
+    http_response_code(400);
+    $error = 'The setup link is missing a token.';
+} else {
+    $stmt = $conn->prepare('SELECT UserID FROM users WHERE token = ? AND token_expiry > NOW() LIMIT 1');
+    $stmt->bind_param('s', $token);
+    $stmt->execute();
+    $user = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$user) {
+        http_response_code(410);
+        $error = 'This setup link is invalid or expired. Ask your administrator for a new invitation.';
+    } else {
+        $userId = (int) $user['UserID'];
+    }
 }
 
-$token = mysqli_real_escape_string($conn, $_GET['token']);
-$result = mysqli_query($conn, "SELECT * FROM users WHERE token='$token' AND token_expiry > NOW()");
+if ($userId > 0 && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $username = trim($_POST['username'] ?? '');
+    $password = $_POST['password'] ?? '';
+    $confirmPassword = $_POST['confirm_password'] ?? '';
 
-if (mysqli_num_rows($result) === 0) {
-    die("Link expired or invalid.");
-}
+    if (strlen($username) < 3 || strlen($username) > 100) {
+        $error = 'Username must be between 3 and 100 characters.';
+    } elseif (strlen($password) < 8) {
+        $error = 'Password must be at least 8 characters.';
+    } elseif ($password !== $confirmPassword) {
+        $error = 'The passwords do not match.';
+    } else {
+        $check = $conn->prepare('SELECT UserID FROM users WHERE username = ? AND UserID <> ? LIMIT 1');
+        $check->bind_param('si', $username, $userId);
+        $check->execute();
+        $usernameExists = $check->get_result()->num_rows > 0;
+        $check->close();
 
-$user = mysqli_fetch_assoc($result);
+        if ($usernameExists) {
+            $error = 'That username is already in use.';
+        } else {
+            $passwordHash = password_hash($password, PASSWORD_DEFAULT);
+            $update = $conn->prepare(
+                'UPDATE users SET username = ?, password = ?, token = NULL, token_expiry = NULL
+                 WHERE UserID = ? AND token = ? AND token_expiry > NOW()'
+            );
+            $update->bind_param('ssis', $username, $passwordHash, $userId, $token);
+            $update->execute();
+            $complete = $update->affected_rows === 1;
+            $update->close();
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = mysqli_real_escape_string($conn, $_POST['username']);
-    $password = password_hash($_POST['password'], PASSWORD_BCRYPT);
-    
-    mysqli_query($conn, "UPDATE users SET username='$username', password='$password', token=NULL, token_expiry=NULL WHERE UserID={$user['UserID']}");
-    
-    // Show confirmation message with nice UI
-    ?>
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <title>Account Setup Complete</title>
-      <style>
-        body {
-          font-family: Arial, sans-serif;
-          background: #f4f7fa;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          height: 100vh;
-          margin: 0;
+            if (!$complete) {
+                http_response_code(410);
+                $error = 'This setup link is invalid or expired. Ask your administrator for a new invitation.';
+            }
         }
-        .message-box {
-          background: white;
-          padding: 30px 40px;
-          border-radius: 8px;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-          max-width: 400px;
-          text-align: center;
-        }
-        .message-box h2 {
-          color:rgb(192, 3, 3);
-          margin-bottom: 20px;
-        }
-        .message-box a {
-          color:rgb(233, 36, 69);
-          text-decoration: none;
-          font-weight: 600;
-        }
-        .message-box a:hover {
-          text-decoration: underline;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="message-box">
-        <h2>Account setup complete.</h2>
-        <p>You can now <a href="../auth/role_selection.php">log in</a>.</p>
-      </div>
-    </body>
-    </html>
-    <?php
-    exit();
+    }
 }
 ?>
 
@@ -78,6 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Complete Registration</title>
+  <link rel="stylesheet" href="../css/style.css">
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -138,14 +131,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body>
 
-<form method="POST" autocomplete="off" novalidate>
+<form method="POST" autocomplete="off">
+  <?php if ($complete): ?>
+    <h2>Account setup complete</h2>
+    <p>You can now <a href="role_selection.php">sign in</a>.</p>
+  <?php elseif ($error !== ''): ?>
+    <p role="alert" style="color:#9b1c31;"><?= htmlspecialchars($error) ?></p>
+  <?php endif; ?>
+  <?php if ($userId > 0 && !$complete): ?>
   <label for="username">Choose Username</label>
-  <input type="text" id="username" name="username" required autocomplete="off" />
+  <input type="text" id="username" name="username" minlength="3" maxlength="100" required autocomplete="username" />
   
   <label for="password">Create Password</label>
-  <input type="password" id="password" name="password" required autocomplete="new-password" />
+  <input type="password" id="password" name="password" minlength="8" required autocomplete="new-password" />
+
+  <label for="confirm_password">Confirm Password</label>
+  <input type="password" id="confirm_password" name="confirm_password" minlength="8" required autocomplete="new-password" />
   
   <button type="submit">Complete Registration</button>
+  <?php endif; ?>
 </form>
 
 </body>

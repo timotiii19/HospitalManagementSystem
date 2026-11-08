@@ -157,24 +157,24 @@
     <h2 class="sidebar-title">Doctor Dashboard</h2>
   </div>
   <ul>
-    <li><a href="/HMS-main/views/doctors/dashboard.php"><i class="fa fa-chart-line"></i><span class="label">Dashboard</span></a></li>
-    <li><a href="/HMS-main/views/doctors/appointments.php"><i class="fa fa-calendar-check"></i><span class="label">Patient Confirmation</span></a></li>
+    <li><a href="<?= APP_BASE_URL ?>/views/doctors/dashboard.php"><i class="fa fa-chart-line"></i><span class="label">Dashboard</span></a></li>
+    <li><a href="<?= APP_BASE_URL ?>/views/doctors/appointments.php"><i class="fa fa-calendar-check"></i><span class="label">Patient Confirmation</span></a></li>
     
     <li class="dropdown">
       <a href="javascript:void(0);" class="dropdown-btn">
         <i class="fa fa-user-cog"></i><span class="label">My Schedule</span>
       </a>
       <ul class="dropdown-content">
-        <li><a href="/HMS-main/views/doctors/doctorschedule.php">Appointment</a></li> 
-        <li><a href="/HMS-main/views/doctors/inpatient.php">Inpatient</a></li>
-        <li><a href="/HMS-main/views/doctors/outpatient.php">Outpatient</a></li>
+        <li><a href="<?= APP_BASE_URL ?>/views/doctors/doctorschedule.php">Appointment</a></li>
+        <li><a href="<?= APP_BASE_URL ?>/views/doctors/inpatient.php">Inpatient</a></li>
+        <li><a href="<?= APP_BASE_URL ?>/views/doctors/outpatient.php">Outpatient</a></li>
         <li style="text-align: center;">⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯</li>
-        <li><a href="/HMS-main/views/doctors/pastschedules.php">View Past Schedule</a></li>
+        <li><a href="<?= APP_BASE_URL ?>/views/doctors/pastschedules.php">View Past Schedule</a></li>
       </ul>
     </li>
 
-    <li><a href="/HMS-main/views/doctors/labprocedure.php"><i class="fa fa-vials"></i><span class="label">Laboratory Procedure</span></a></li>
-    <!-- <li><a href="/HMS-main/auth/logout.php"><i class="fa fa-sign-out-alt"></i><span class="label">Logout</span></a></li>-->
+    <li><a href="<?= APP_BASE_URL ?>/views/doctors/labprocedure.php"><i class="fa fa-vials"></i><span class="label">Laboratory Procedure</span></a></li>
+    <!-- <li><a href="<?= APP_BASE_URL ?>/auth/logout.php"><i class="fa fa-sign-out-alt"></i><span class="label">Logout</span></a></li>-->
   </ul>
 </div>
 
@@ -206,6 +206,11 @@
   });
 
   sidebarToggle.addEventListener('click', () => {
+    if (window.matchMedia('(max-width: 680px)').matches) {
+      sidebar.classList.toggle('mobile-open');
+      return;
+    }
+
     sidebar.classList.toggle('collapsed');
 
     if (sidebar.classList.contains('collapsed')) {

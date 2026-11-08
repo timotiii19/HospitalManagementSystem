@@ -14,6 +14,18 @@ include('../../includes/admin_sidebar.php');
 include('../../config/db.php');
 include('../../auth/mailer.php'); // Your mail function
 
+$csrfToken = $_SESSION['csrf_token'] ??= bin2hex(random_bytes(32));
+$csrfValid = $_SERVER['REQUEST_METHOD'] !== 'POST'
+    || (isset($_POST['csrf_token']) && hash_equals($csrfToken, $_POST['csrf_token']));
+
+$success_message = $_SESSION['success_message'] ?? '';
+unset($_SESSION['success_message']);
+
+if (!$csrfValid) {
+    http_response_code(403);
+    $error_message = 'Your session expired. Refresh the page and try again.';
+}
+
 // Get all users
 function getUsers($conn) {
     $query = "SELECT UserID, username, full_name, email, role, ContactNumber FROM users";
@@ -21,113 +33,238 @@ function getUsers($conn) {
     return mysqli_fetch_all($result, MYSQLI_ASSOC);
 }
 
-// Handle Add User - NO username or password, send activation link instead
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['full_name']) && isset($_POST['email'])) {
-    $full_name = mysqli_real_escape_string($conn, $_POST['full_name']);
-    $email = mysqli_real_escape_string($conn, $_POST['email']);
-    $role = mysqli_real_escape_string($conn, $_POST['role']);
-    $contact = mysqli_real_escape_string($conn, $_POST['ContactNumber']);
+if ($csrfValid && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['full_name'], $_POST['email'], $_POST['role'])) {
+    $full_name = trim($_POST['full_name']);
+    $email = trim($_POST['email']);
+    $role = $_POST['role'];
+    $contact = trim($_POST['ContactNumber'] ?? '');
+    $allowedRoles = ['Admin', 'Doctor', 'Nurse', 'Pharmacist', 'Cashier'];
 
-    // Check if email already exists
-    $check_query = "SELECT * FROM users WHERE email = '$email'";
-    $check_result = mysqli_query($conn, $check_query);
-    if (mysqli_num_rows($check_result) > 0) {
-        $error_message = "Email already exists!";
+    if ($full_name === '' || strlen($full_name) > 200) {
+        $error_message = 'Enter a name of 1 to 200 characters.';
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 200) {
+        $error_message = 'Enter a valid email address (maximum 200 characters).';
+    } elseif ($contact === '' || strlen($contact) > 30) {
+        $error_message = 'Enter a contact number of 1 to 30 characters.';
+    } elseif (!in_array($role, $allowedRoles, true)) {
+        $error_message = 'Select a valid employee role.';
     } else {
-        $token = bin2hex(random_bytes(16));
-          $expiry = date('Y-m-d H:i:s', strtotime('+1 day'));
-        $query = "INSERT INTO users (full_name, email, role, ContactNumber, token, token_expiry) 
-          VALUES ('$full_name', '$email', '$role', '$contact', '$token', '$expiry')";
-        if (mysqli_query($conn, $query)) {
-            $user_id = mysqli_insert_id($conn);
-            switch ($role) {
-                case 'Doctor':
-                    mysqli_query($conn, "INSERT INTO doctor (UserID, DoctorName, Email) VALUES ('$user_id', '$full_name', '$email')");
-                    break;
-                case 'Nurse':
-                    mysqli_query($conn, "INSERT INTO nurse (UserID, Name, Email) VALUES ('$user_id', '$full_name', '$email')");
-                    break;
-                case 'Pharmacist':
-                    mysqli_query($conn, "INSERT INTO pharmacist (UserID, Name, Email) VALUES ('$user_id', '$full_name', '$email')");
-                    break;
-                case 'Cashier':
-                    mysqli_query($conn, "INSERT INTO cashier (UserID, Name) VALUES ('$user_id', '$full_name')");
-                    break;
-                case 'Admin':
-                default:
-                    mysqli_query($conn, "INSERT INTO admin (UserID) VALUES ('$user_id')");
-                    break;
-            }
-            // Send activation email
-            // Prepare activation link URL (replace localhost with your real domain when deploying)
-            $link = "http://localhost/HMS-main/auth/complete_registration.php?token=$token";
+        $check = $conn->prepare('SELECT UserID FROM users WHERE email = ? LIMIT 1');
+        $check->bind_param('s', $email);
+        $check->execute();
+        $emailExists = $check->get_result()->num_rows > 0;
+        $check->close();
 
-            $subject = "Set up your account";
+        if ($emailExists) {
+            $error_message = 'An account already uses that email address.';
+        } else {
+            $token = bin2hex(random_bytes(32));
+            try {
+                $conn->begin_transaction();
+                $insertUser = $conn->prepare(
+                    'INSERT INTO users (full_name, email, role, ContactNumber, token, token_expiry)
+                     VALUES (?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 1 DAY))'
+                );
+                $insertUser->bind_param('sssss', $full_name, $email, $role, $contact, $token);
+                $insertUser->execute();
+                $user_id = $conn->insert_id;
+                $insertUser->close();
 
-            $message = "
-            Hi $full_name,
-            Please click the button below to set up your account:
-            $link Set Up Your Account
-            Or copy and paste the following URL into your browser:
-            $link 
-            $link
-            Thank you!
-            ";
+                $roleInsert = match ($role) {
+                    'Doctor' => $conn->prepare('INSERT INTO doctor (UserID, DoctorName, Email) VALUES (?, ?, ?)'),
+                    'Nurse' => $conn->prepare('INSERT INTO nurse (UserID, Name, Email) VALUES (?, ?, ?)'),
+                    'Pharmacist' => $conn->prepare('INSERT INTO pharmacist (UserID, Name, Email) VALUES (?, ?, ?)'),
+                    'Cashier' => $conn->prepare('INSERT INTO cashier (UserID, Name) VALUES (?, ?)'),
+                    'Admin' => $conn->prepare('INSERT INTO admin (UserID) VALUES (?)'),
+                };
 
-            $headers = "MIME-Version: 1.0" . "\r\n";
-            $headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
-            $headers .= 'From: Your Company <no-reply@yourdomain.com>' . "\r\n";
-
-            mail($email, $subject, $message, $headers);
-
-
-           if (sendMail($email, $subject, $message)) {
-                $_SESSION['success_message'] = "User added and activation email sent successfully!";
-                header("Location: employees.php");
-                exit();
-            } else {
-                $error_message = "User added, but failed to send activation email.";
-            }
-
+                if ($role === 'Admin') {
+                    $roleInsert->bind_param('i', $user_id);
+                } elseif ($role === 'Cashier') {
+                    $roleInsert->bind_param('is', $user_id, $full_name);
+                } else {
+                    $roleInsert->bind_param('iss', $user_id, $full_name, $email);
                 }
+
+                $roleInsert->execute();
+                $roleInsert->close();
+                $conn->commit();
+            } catch (mysqli_sql_exception $exception) {
+                $conn->rollback();
+                error_log('Unable to create employee account: ' . $exception->getMessage());
+                $error_message = 'The account could not be created. No changes were saved.';
             }
-}
 
-// Handle delete request
-if (isset($_GET['delete'])) {
-    $delete_id = intval($_GET['delete']);
+            if (!isset($error_message)) {
+                $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+                $activationLink = $scheme . '://' . $host . APP_BASE_URL
+                    . '/auth/complete_registration.php?token=' . rawurlencode($token);
+                $message = "Hello $full_name,\n\n"
+                    . "Use the link below within 24 hours to set up your Hospital Management System account:\n"
+                    . $activationLink . "\n\n"
+                    . "If you were not expecting this invitation, contact your hospital administrator.";
 
-    // Optional: Delete from role-specific table first
-    $role_result = mysqli_query($conn, "SELECT role FROM users WHERE UserID = $delete_id");
-    if ($role_result && mysqli_num_rows($role_result) > 0) {
-        $role_row = mysqli_fetch_assoc($role_result);
-        $role = $role_row['role'];
+                if (sendMail($email, 'Set up your hospital account', $message)) {
+                    $_SESSION['success_message'] = 'Employee added and activation email sent.';
+                    header('Location: employees.php');
+                    exit();
+                }
 
-        switch ($role) {
-            case 'Doctor':
-                mysqli_query($conn, "DELETE FROM doctor WHERE UserID = $delete_id");
-                break;
-            case 'Nurse':
-                mysqli_query($conn, "DELETE FROM nurse WHERE UserID = $delete_id");
-                break;
-            case 'Pharmacist':
-                mysqli_query($conn, "DELETE FROM pharmacist WHERE UserID = $delete_id");
-                break;
-            case 'Cashier':
-                mysqli_query($conn, "DELETE FROM cashier WHERE UserID = $delete_id");
-                break;
-            case 'Admin':
-                mysqli_query($conn, "DELETE FROM admin WHERE UserID = $delete_id");
-                break;
+                $error_message = 'The employee account was created, but the activation email was not sent. '
+                    . 'Configure SMTP, then give the employee the setup link below. The link expires in 24 hours.';
+                $pending_activation_link = $activationLink;
+            }
         }
     }
+}
 
-    // Now delete from main users table
-    mysqli_query($conn, "DELETE FROM users WHERE UserID = $delete_id");
+if ($csrfValid && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
+    $userId = filter_var($_POST['edit_user_id'] ?? null, FILTER_VALIDATE_INT);
+    $username = trim($_POST['edit_username'] ?? '');
+    $fullName = trim($_POST['edit_full_name'] ?? '');
+    $email = trim($_POST['edit_email'] ?? '');
+    $contact = trim($_POST['edit_ContactNumber'] ?? '');
 
-    // Redirect to prevent resubmission on page refresh
-    header("Location: employees.php");
-    exit();
+    if (!$userId || strlen($username) < 3 || strlen($username) > 100) {
+        $error_message = 'Enter a valid user and a username of 3 to 100 characters.';
+    } elseif ($fullName === '' || strlen($fullName) > 200) {
+        $error_message = 'Enter a name of 1 to 200 characters.';
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 200) {
+        $error_message = 'Enter a valid email address (maximum 200 characters).';
+    } elseif ($contact === '' || strlen($contact) > 30) {
+        $error_message = 'Enter a contact number of 1 to 30 characters.';
+    } else {
+        $check = $conn->prepare(
+            'SELECT UserID FROM users WHERE (username = ? OR email = ?) AND UserID <> ? LIMIT 1'
+        );
+        $check->bind_param('ssi', $username, $email, $userId);
+        $check->execute();
+        $duplicate = $check->get_result()->num_rows > 0;
+        $check->close();
+
+        if ($duplicate) {
+            $error_message = 'That username or email is already used by another account.';
+        } else {
+            $existingUser = $conn->prepare('SELECT role FROM users WHERE UserID = ? LIMIT 1');
+            $existingUser->bind_param('i', $userId);
+            $existingUser->execute();
+            $userData = $existingUser->get_result()->fetch_assoc();
+            $existingUser->close();
+
+            if (!$userData) {
+                $error_message = 'That employee account no longer exists.';
+            } else {
+                try {
+                    $conn->begin_transaction();
+                    $update = $conn->prepare(
+                        'UPDATE users SET username = ?, full_name = ?, email = ?, ContactNumber = ?
+                         WHERE UserID = ?'
+                    );
+                    $update->bind_param('ssssi', $username, $fullName, $email, $contact, $userId);
+                    $update->execute();
+                    $update->close();
+
+                    $roleUpdate = match ($userData['role']) {
+                        'Doctor' => $conn->prepare('UPDATE doctor SET DoctorName = ?, Email = ? WHERE UserID = ?'),
+                        'Nurse' => $conn->prepare('UPDATE nurse SET Name = ?, Email = ? WHERE UserID = ?'),
+                        'Pharmacist' => $conn->prepare('UPDATE pharmacist SET Name = ?, Email = ? WHERE UserID = ?'),
+                        'Cashier' => $conn->prepare('UPDATE cashier SET Name = ? WHERE UserID = ?'),
+                        default => null,
+                    };
+
+                    if ($roleUpdate) {
+                        if ($userData['role'] === 'Cashier') {
+                            $roleUpdate->bind_param('si', $fullName, $userId);
+                        } else {
+                            $roleUpdate->bind_param('ssi', $fullName, $email, $userId);
+                        }
+                        $roleUpdate->execute();
+                        $roleUpdate->close();
+                    }
+
+                    $conn->commit();
+                    $_SESSION['success_message'] = 'Employee details updated.';
+                    header('Location: employees.php');
+                    exit();
+                } catch (mysqli_sql_exception $exception) {
+                    $conn->rollback();
+                    error_log('Unable to update employee account: ' . $exception->getMessage());
+                    $error_message = 'The account could not be updated. No changes were saved.';
+                }
+            }
+        }
+    }
+}
+
+if ($csrfValid && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_user'])) {
+    $deleteId = filter_var($_POST['delete_user'], FILTER_VALIDATE_INT);
+    $roleTables = [
+        'Admin' => 'admin',
+        'Doctor' => 'doctor',
+        'Nurse' => 'nurse',
+        'Pharmacist' => 'pharmacist',
+        'Cashier' => 'cashier',
+    ];
+
+    if (!$deleteId) {
+        $error_message = 'Select a valid employee account to delete.';
+    } else {
+        try {
+            $conn->begin_transaction();
+            $roleLookup = $conn->prepare('SELECT role, email FROM users WHERE UserID = ? LIMIT 1 FOR UPDATE');
+            $roleLookup->bind_param('i', $deleteId);
+            $roleLookup->execute();
+            $userRole = $roleLookup->get_result()->fetch_assoc();
+            $roleLookup->close();
+
+            if (!$userRole || !isset($roleTables[$userRole['role']])) {
+                $conn->rollback();
+                $error_message = 'That employee account no longer exists.';
+            } elseif ($userRole['role'] === 'Admin' && (int) $deleteId === (int) $_SESSION['UserID']) {
+                $conn->rollback();
+                $error_message = 'You cannot delete the account you are currently using.';
+            } else {
+                if ($userRole['role'] === 'Admin') {
+                    $adminCount = $conn->query(
+                        "SELECT COUNT(*) AS total FROM users u
+                         INNER JOIN admin a ON a.UserID = u.UserID
+                         WHERE u.role = 'Admin'"
+                    )
+                        ->fetch_assoc()['total'];
+                    if ((int) $adminCount <= 1) {
+                        $conn->rollback();
+                        $error_message = 'The last administrator account cannot be deleted.';
+                    }
+                }
+
+                if (!isset($error_message)) {
+                    $roleDelete = $conn->prepare('DELETE FROM `' . $roleTables[$userRole['role']] . '` WHERE UserID = ?');
+                    $roleDelete->bind_param('i', $deleteId);
+                    $roleDelete->execute();
+                    $roleDelete->close();
+
+                    $resetDelete = $conn->prepare('DELETE FROM password_resets WHERE email = ?');
+                    $resetDelete->bind_param('s', $userRole['email']);
+                    $resetDelete->execute();
+                    $resetDelete->close();
+
+                    $userDelete = $conn->prepare('DELETE FROM users WHERE UserID = ?');
+                    $userDelete->bind_param('i', $deleteId);
+                    $userDelete->execute();
+                    $userDelete->close();
+                    $conn->commit();
+                    $_SESSION['success_message'] = 'Employee account deleted.';
+                    header('Location: employees.php');
+                    exit();
+                }
+            }
+        } catch (mysqli_sql_exception $exception) {
+            $conn->rollback();
+            error_log('Unable to delete employee account: ' . $exception->getMessage());
+            $error_message = 'The account could not be deleted. No changes were saved.';
+        }
+    }
 }
 
 
@@ -400,7 +537,20 @@ button.view-btn:hover {
 </head>
 <body>
 
-<div class="content">
+<div class="content employee-layout">
+    <?php if ($success_message !== ''): ?>
+        <p class="notice notice-success" role="status"><?= htmlspecialchars($success_message) ?></p>
+    <?php endif; ?>
+    <?php if (isset($error_message)): ?>
+        <div class="notice notice-error" role="alert">
+            <p><?= htmlspecialchars($error_message) ?></p>
+            <?php if (isset($pending_activation_link)): ?>
+                <p><a href="<?= htmlspecialchars($pending_activation_link) ?>">Open activation link</a></p>
+                <label for="pendingActivationLink">Or copy this link to the employee:</label>
+                <input id="pendingActivationLink" type="text" readonly value="<?= htmlspecialchars($pending_activation_link) ?>">
+            <?php endif; ?>
+        </div>
+    <?php endif; ?>
     <div class="left-column">
         <h2>User List</h2>
         <table>
@@ -420,15 +570,20 @@ button.view-btn:hover {
                     <td><?= ucfirst(htmlspecialchars($user['role'])) ?></td>
                     <td>
                         <?php if ($can_edit): ?>
-                        <a href="javascript:void(0);" class="edit-btn"
+                        <button type="button" class="edit-btn"
+                           aria-label="Edit <?= htmlspecialchars($user['username'] ?? 'employee', ENT_QUOTES, 'UTF-8') ?>"
                            data-id="<?= $user['UserID'] ?>"
-                           data-username="<?= htmlspecialchars($user['username']) ?>"
-                           data-full_name="<?= htmlspecialchars($user['full_name']) ?>"
-                           data-email="<?= htmlspecialchars($user['email']) ?>"
-                           data-contact="<?= htmlspecialchars($user['ContactNumber']) ?>"
-                           data-role="<?= htmlspecialchars($user['role']) ?>" ></a> 
+                           data-username="<?= htmlspecialchars($user['username'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                           data-full_name="<?= htmlspecialchars($user['full_name'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                           data-email="<?= htmlspecialchars($user['email'], ENT_QUOTES, 'UTF-8') ?>"
+                           data-contact="<?= htmlspecialchars($user['ContactNumber'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                           data-role="<?= htmlspecialchars($user['role'], ENT_QUOTES, 'UTF-8') ?>">Edit</button>
                         <?php endif; ?>
-                        <a href="employees.php?delete=<?= $user['UserID'] ?>" onclick="return confirm('Delete this user?');" class="delete-link">Delete</a>
+                        <form method="POST" action="employees.php" class="delete-user-form" onsubmit="return confirm('Delete this user?');">
+                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
+                            <input type="hidden" name="delete_user" value="<?= (int) $user['UserID'] ?>">
+                            <button type="submit" class="delete-link">Delete</button>
+                        </form>
                     </td>
                 </tr>
             <?php endforeach; ?>
@@ -440,7 +595,7 @@ button.view-btn:hover {
         <h2>Add Employee</h2>
         <div class="form-container">
             <form method="POST" action="employees.php">
-                <!-- Removed Username and Password inputs -->
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
                 <label for="full_name">Full Name</label>
                 <input type="text" name="full_name" required>
 
@@ -462,8 +617,6 @@ button.view-btn:hover {
 
                 <button type="submit">Add User</button>
             </form>
-            <?php if (isset($error_message)) echo "<p style='color:red;'>$error_message</p>"; ?>
-
         </div>
     </div>
 </div>
@@ -471,6 +624,7 @@ button.view-btn:hover {
 <!-- Edit Modal -->
 <div id="editModal" style="display:none; position:fixed; top:20%; left:50%; transform:translateX(-50%); background:#fff; padding:15px; box-shadow:0 0 8px rgba(0,0,0,0.2); z-index:999; font-size:14px; width:350px;">
     <form method="POST" action="employees.php">
+        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
         <input type="hidden" name="edit_user_id" id="edit_user_id">
         <label>Username</label>
         <input type="text" name="edit_username" id="edit_username" required>
@@ -480,14 +634,8 @@ button.view-btn:hover {
         <input type="email" name="edit_email" id="edit_email" required>
         <label>Contact Number</label>
         <input type="text" name="edit_ContactNumber" id="edit_ContactNumber" required>
-        <label>Role</label>
-        <select name="edit_role" id="edit_role" required>
-            <option value="Admin">Admin</option>
-            <option value="Doctor">Doctor</option>
-            <option value="Nurse">Nurse</option>
-            <option value="Pharmacist">Pharmacist</option>
-            <option value="Cashier">Cashier</option>
-        </select>
+        <label for="edit_role">Role (managed separately)</label>
+        <input type="text" id="edit_role" readonly>
         <div style="margin-top:10px; text-align:right;">
             <button type="submit" name="update_user">Update</button>
             <button type="button" onclick="document.getElementById('editModal').style.display='none'">Cancel</button>

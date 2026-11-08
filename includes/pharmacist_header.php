@@ -5,12 +5,12 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-include_once $_SERVER['DOCUMENT_ROOT'] . '/HMS-main/config/db.php';
+require_once __DIR__ . '/../config/db.php';
 
 // Check if user is logged in and role is pharm
 if (!isset($_SESSION['UserID'], $_SESSION['role']) || $_SESSION['role'] !== 'Pharmacist') {
     // Not logged in as pharm, redirect to login page
-    header('Location: /HMS-main/auth/pharmacist_login.php');
+    header('Location: ' . APP_BASE_URL . '/auth/pharmacist_login.php');
     exit();
 }
 
@@ -53,6 +53,7 @@ if ($conn) {
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Pharmacist Dashboard</title>
+<link rel="stylesheet" href="<?= APP_BASE_URL ?>/css/style.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 <style>
   body {
@@ -224,11 +225,11 @@ if ($conn) {
   }
 </style>
 </head>
-<body>
+<body class="role-app">
 
 <div class="header">
   <div class="left-section">
-    <img src="/HMS-main/images/hosplogo.png" alt="Hospital Logo" class="logo" />
+    <img src="<?= APP_BASE_URL ?>/images/hosplogo.png" alt="Hospital Logo" class="logo" />
   </div>
 
   <div class="search-section">
@@ -237,14 +238,14 @@ if ($conn) {
   </div>
 
   <div class="right-section">
-    <img src="/HMS-main/images/profile1.png" alt="User Avatar" class="avatar" />
+    <img src="<?= APP_BASE_URL ?>/images/profile1.png" alt="User Avatar" class="avatar" />
     <div class="user-dropdown" id="userDropdownToggle">
       <span>
         Pharmacist: <?php echo htmlspecialchars($_SESSION['full_name'] ?? 'Unknown'); ?> <i class="fas fa-chevron-down"></i>
       </span>
       <div class="dropdown-content" id="userDropdownMenu">
         <button id="openProfileBtn" type="button">My Profile</button>
-        <a href="/HMS-main/auth/logout.php">Logout</a>
+        <a href="<?= APP_BASE_URL ?>/auth/logout.php">Logout</a>
       </div>
     </div>
   </div>
@@ -287,7 +288,7 @@ if ($conn) {
       alert('Please enter a search term');
       return;
     }
-    window.location.href = `/HMS-main/views/pharmacist/search.php?query=${encodeURIComponent(query)}`;
+    window.location.href = `<?= APP_BASE_URL ?>/views/search.php?query=${encodeURIComponent(query)}`;
   }
 
   searchInput.addEventListener('keypress', function (e) {
@@ -339,7 +340,7 @@ if ($conn) {
 
     const formData = new FormData(profileForm);
 
-    fetch('/HMS-main/includes/update_profile.php', {
+    fetch('<?= APP_BASE_URL ?>/includes/update_profile.php', {
       method: 'POST',
       body: formData
     })

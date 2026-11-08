@@ -5,8 +5,9 @@ if (!isset($_SESSION['username']) || $_SESSION['role'] != 'Pharmacist') {
     exit();
 }
 
+include('../../config/db.php');
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['dispense'])) {
-    include('../../config/db.php');
     $medication_id = $_POST['medication_id'];
 
     $update_query = "UPDATE patientmedication SET Status = 'Already Dispensed' WHERE PatientMedicationID = ?";
@@ -23,9 +24,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['dispense'])) {
 }
 
 // Only include UI after redirects
-include('../../includes/pharmacist_sidebar.php');
 include('../../includes/pharmacist_header.php');
-include('../../config/db.php');
+include('../../includes/pharmacist_sidebar.php');
 
 
 $medications = $conn->query("SELECT pm.*, p.Name AS PatientName, d.DoctorName AS DoctorName 

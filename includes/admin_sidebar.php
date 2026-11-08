@@ -4,30 +4,30 @@
     <h2 class="sidebar-title">Admin Dashboard</h2>
   </div>
   <ul>
-    <li><a href="/HMS-main/views/admin/dashboard.php"><i class="fa fa-chart-line"></i><span class="label">Dashboard</span></a></li>
+    <li><a href="<?= APP_BASE_URL ?>/views/admin/dashboard.php"><i class="fa fa-chart-line"></i><span class="label">Dashboard</span></a></li>
 
     <li class="dropdown">
     <a href="javascript:void(0);" class="dropdown-btn">
       <i class="fa fa-user-cog"></i><span class="label">Employees</span>
     </a>
     <ul class="dropdown-content">
-      <li><a href="/HMS-main/views/admin/employees.php">Employees Management</a></li> 
+      <li><a href="<?= APP_BASE_URL ?>/views/admin/employees.php">Employees Management</a></li>
       <li style="text-align: center;">⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯</li>
-      <li><a href="/HMS-main/views/admin/admin.php">Admins Management</a></li>
-      <li><a href="/HMS-main/views/admin/doctors.php">Doctors Management</a></li>
-      <li><a href="/HMS-main/views/admin/nurses.php">Nurses Management</a></li>
-      <li><a href="/HMS-main/views/admin/pharmacists.php">Pharmacists Management</a></li>
-      <li><a href="/HMS-main/views/admin/cashiers.php">Cashiers Management</a></li>
+      <li><a href="<?= APP_BASE_URL ?>/views/admin/admin.php">Admins Management</a></li>
+      <li><a href="<?= APP_BASE_URL ?>/views/admin/doctors.php">Doctors Management</a></li>
+      <li><a href="<?= APP_BASE_URL ?>/views/admin/nurses.php">Nurses Management</a></li>
+      <li><a href="<?= APP_BASE_URL ?>/views/admin/pharmacists.php">Pharmacists Management</a></li>
+      <li><a href="<?= APP_BASE_URL ?>/views/admin/cashiers.php">Cashiers Management</a></li>
     </ul>
   </li>
 
 
-    <li><a href="/HMS-main/views/admin/appointments.php"><i class="fa fa-calendar-check"></i><span class="label">Appointments</span></a></li>
-    <li><a href="/HMS-main/views/admin/departments.php"><i class="fa fa-building"></i><span class="label">Departments</span></a></li>
-    <li><a href="/HMS-main/views/admin/location.php"><i class="fa fa-map-marker-alt"></i><span class="label">Locations</span></a></li>
-    <li><a href="/HMS-main/views/admin/reports.php"><i class="fa fa-file-invoice-dollar"></i><span class="label">Billing</span></a></li>
-    <li><a href="/HMS-main/views/admin/patients.php"><i class="fa fa-procedures"></i><span class="label">Patients</span></a></li>
-   <!-- <li><a href="/HMS-main/auth/logout.php"><i class="fa fa-sign-out-alt"></i><span class="label">Logout</span></a></li>-->
+    <li><a href="<?= APP_BASE_URL ?>/views/admin/appointments.php"><i class="fa fa-calendar-check"></i><span class="label">Appointments</span></a></li>
+    <li><a href="<?= APP_BASE_URL ?>/views/admin/departments.php"><i class="fa fa-building"></i><span class="label">Departments</span></a></li>
+    <li><a href="<?= APP_BASE_URL ?>/views/admin/location.php"><i class="fa fa-map-marker-alt"></i><span class="label">Locations</span></a></li>
+    <li><a href="<?= APP_BASE_URL ?>/views/admin/reports.php"><i class="fa fa-file-invoice-dollar"></i><span class="label">Billing</span></a></li>
+    <li><a href="<?= APP_BASE_URL ?>/views/admin/patients.php"><i class="fa fa-procedures"></i><span class="label">Patients</span></a></li>
+   <!-- <li><a href="<?= APP_BASE_URL ?>/auth/logout.php"><i class="fa fa-sign-out-alt"></i><span class="label">Logout</span></a></li>-->
   </ul>
 </div>
 
@@ -62,6 +62,11 @@
   });
 
   sidebarToggle.addEventListener('click', () => {
+    if (window.matchMedia('(max-width: 680px)').matches) {
+      sidebar.classList.toggle('mobile-open');
+      return;
+    }
+
     sidebar.classList.toggle('collapsed');
     if (sidebar.classList.contains('collapsed')) {
       content.style.marginLeft = '60px';

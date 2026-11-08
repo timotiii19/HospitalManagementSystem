@@ -206,33 +206,33 @@ if ($hour < 12) {
     <div class="dashboard-cards">
         <!-- Removed Dashboard Card -->
 
-        <a href="/HMS-main/views/doctors/appointments.php" class="card">
+        <a href="<?= APP_BASE_URL ?>/views/doctors/appointments.php" class="card">
             <i class="fa fa-calendar-check"></i>
             <div class="card-title">Patient Confirmation</div>
         </a>
 
-        <a href="/HMS-main/views/doctors/doctorschedule.php" class="card">
+        <a href="<?= APP_BASE_URL ?>/views/doctors/doctorschedule.php" class="card">
             <i class="fa fa-calendar-day"></i>
             <div class="card-title">Appointment</div>
         </a>
 
-        <a href="/HMS-main/views/doctors/inpatient.php" class="card">
+        <a href="<?= APP_BASE_URL ?>/views/doctors/inpatient.php" class="card">
             <i class="fa fa-procedures"></i>
             <div class="card-title">Inpatient</div>
         </a>
 
-        <a href="/HMS-main/views/doctors/outpatient.php" class="card">
+        <a href="<?= APP_BASE_URL ?>/views/doctors/outpatient.php" class="card">
             <i class="fa fa-user-md"></i>
             <div class="card-title">Outpatient</div>
         </a>
 
-        <a href="/HMS-main/views/doctors/pastschedules.php" class="card">
+        <a href="<?= APP_BASE_URL ?>/views/doctors/pastschedules.php" class="card">
             <i class="fa fa-history"></i>
             <div class="card-title">Past Schedules</div>
         </a>
 
 
-        <a href="/HMS-main/views/doctors/labprocedure.php" class="card">
+        <a href="<?= APP_BASE_URL ?>/views/doctors/labprocedure.php" class="card">
             <i class="fa fa-flask"></i>
             <div class="card-title">Lab Procedure</div>
         </a>

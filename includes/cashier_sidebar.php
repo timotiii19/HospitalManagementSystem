@@ -176,25 +176,25 @@
   </div>
   <ul>
     <li>
-     <a href="/HMS-main/views/cashier/dashboard.php"><i class="fa fa-chart-line"></i><span class="label">Dashboard</span>
+     <a href="<?= APP_BASE_URL ?>/views/cashier/dashboard.php"><i class="fa fa-chart-line"></i><span class="label">Dashboard</span>
       </a>
     </li>
     <li>
-      <a href="/HMS-main/views/cashier/doctor.php">
+      <a href="<?= APP_BASE_URL ?>/views/cashier/doctor.php">
         <i class="fas fa-user-md"></i><span class="label">Doctor</span>
       </a>
     </li>
     <li>
-      <a href="/HMS-main/views/cashier/patient_billing.php">
+      <a href="<?= APP_BASE_URL ?>/views/cashier/patient_billing.php">
         <i class="fas fa-file-invoice-dollar"></i><span class="label">Billing</span>
       </a>
     </li>
     <li>
-      <a href="/HMS-main/views/cashier/pharmacy.php">
+      <a href="<?= APP_BASE_URL ?>/views/cashier/pharmacy.php">
         <i class="fas fa-pills"></i><span class="label">Pharmacy</span>
       </a>
     </li>
-   <!-- <li><a href="/HMS-main/auth/logout.php"><i class="fa fa-sign-out-alt"></i><span class="label">Logout</span></a></li>-->
+   <!-- <li><a href="<?= APP_BASE_URL ?>/auth/logout.php"><i class="fa fa-sign-out-alt"></i><span class="label">Logout</span></a></li>-->
   </ul>
 </div>
 
@@ -204,6 +204,11 @@
   const content = document.querySelector('.content');
 
   sidebarToggle.addEventListener('click', () => {
+    if (window.matchMedia('(max-width: 680px)').matches) {
+      sidebar.classList.toggle('mobile-open');
+      return;
+    }
+
     sidebar.classList.toggle('collapsed');
     if (sidebar.classList.contains('collapsed')) {
       content.style.marginLeft = '60px';

@@ -6,47 +6,48 @@ include('../auth/mailer.php');  // Your mail helper
 $message = "";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = $_POST['email'] ?? '';
+    $email = trim($_POST['email'] ?? '');
     $role = $_POST['role'] ?? '';
+    $allowedRoles = ['Admin', 'Doctor', 'Nurse', 'Pharmacist', 'Cashier'];
 
-    // Basic validation
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $message = "Invalid email address.";
-    } elseif (empty($role)) {
+    } elseif (!in_array($role, $allowedRoles, true)) {
         $message = "Please select a role.";
     } else {
-        // Check if user exists with given email and role
         $stmt = $conn->prepare("SELECT UserID FROM users WHERE email = ? AND role = ?");
         $stmt->bind_param("ss", $email, $role);
         $stmt->execute();
         $result = $stmt->get_result();
 
         if ($result->num_rows === 1) {
-            // User found, generate token
-            $token = bin2hex(random_bytes(16)); // 32 chars
-            $expires_at = date("Y-m-d H:i:s", strtotime('+1 hour'));
-
-            // Insert or update password_resets
-            $stmt2 = $conn->prepare("REPLACE INTO password_resets (email, token, expires_at) VALUES (?, ?, ?)");
-            $stmt2->bind_param("sss", $email, $token, $expires_at);
+            $token = bin2hex(random_bytes(32));
+            $stmt2 = $conn->prepare(
+                "REPLACE INTO password_resets (email, token, expires_at)
+                 VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 1 HOUR))"
+            );
+            $stmt2->bind_param("ss", $email, $token);
             $stmt2->execute();
+            $stmt2->close();
+            $stmt->close();
 
-            // Prepare reset link
-            $reset_link = "http://localhost/HMS-main/auth/reset_password.php?token=" . $token;
+            $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            $reset_link = $scheme . '://' . $host . APP_BASE_URL . '/auth/reset_password.php?token=' . rawurlencode($token);
 
-            // Compose email
             $subject = "Password Reset Request";
             $body = "Hi,\n\nClick the following link to reset your password:\n$reset_link\n\nThis link expires in 1 hour.\n\nIf you did not request this, please ignore this email.";
-
-            // Send email using your mailer helper function
-            $mail_sent = sendMail($email, $subject, $body);
-
-            if ($mail_sent) {
+            if (sendMail($email, $subject, $body)) {
                 $message = "Password reset link has been sent to your email.";
             } else {
                 $message = "Failed to send reset email. Please try again later.";
+                $delete = $conn->prepare("DELETE FROM password_resets WHERE token = ?");
+                $delete->bind_param("s", $token);
+                $delete->execute();
+                $delete->close();
             }
         } else {
+            $stmt->close();
             $message = "No user found with that email and role.";
         }
     }
@@ -57,7 +58,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Forgot Password</title>
+  <link rel="stylesheet" href="../css/style.css">
   <style>
     * {
       box-sizing: border-box;
@@ -140,8 +143,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <option value="Admin">Admin</option>
       <option value="Doctor">Doctor</option>
       <option value="Nurse">Nurse</option>
-      <option value="Laboratory">Laboratory</option>
       <option value="Pharmacist">Pharmacist</option>
+      <option value="Cashier">Cashier</option>
     </select>
     <button type="submit">Send Reset Link</button>
     

@@ -98,15 +98,15 @@ if ($hour < 12) {
     </div>
 
     <div class="dashboard-cards">
-        <a href="/HMS-main/views/pharmacist/patientmedication.php" class="card">
+        <a href="<?= APP_BASE_URL ?>/views/pharmacist/patientmedication.php" class="card">
             <div class="card-icon"><i class="fa fa-notes-medical"></i></div>
             <div class="card-title">Patient Medication</div>
         </a>
-        <a href="/HMS-main/views/pharmacist/pharmacy.php" class="card">
+        <a href="<?= APP_BASE_URL ?>/views/pharmacist/pharmacy.php" class="card">
             <div class="card-icon"><i class="fa fa-capsules"></i></div>
             <div class="card-title">Pharmacy</div>
         </a>
-        <a href="/HMS-main/views/pharmacist/generate_pharmacy_pdf.php" class="card" target="_blank">
+        <a href="<?= APP_BASE_URL ?>/views/pharmacist/generate_pharmacy_pdf.php" class="card" target="_blank">
             <div class="card-icon"><i class="fa fa-file-pdf"></i></div>
             <div class="card-title">Export Pharmacy PDF</div>
         </a>

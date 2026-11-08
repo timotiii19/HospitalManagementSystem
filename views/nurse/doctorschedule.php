@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_schedule'])) {
     $stmt = $conn->prepare("UPDATE doctorschedule SET DoctorID=?, DepartmentID=?, ScheduleDate=?, StartTime=?, EndTime=?, Status=? WHERE DoctorScheduleID=?");
     $stmt->bind_param("iissssi", $doctor_id, $department_id, $date, $start, $end, $status, $id);
     $stmt->execute();
-    header("Location: doctor_schedule.php");
+    header("Location: doctorschedule.php");
     exit();
 }
 

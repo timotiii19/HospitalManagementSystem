@@ -2,66 +2,67 @@
 session_start();
 include('../config/db.php');
 
-if (!isset($_GET['token'])) {
-    die("No token provided.");
-}
-
-$token = $_GET['token'];
-
-// Debug info (remove in production)
-echo "Token from URL: " . htmlspecialchars($token) . "<br>";
-echo "Server time (PHP): " . date("Y-m-d H:i:s") . "<br>";
-
-$current_php_time = date("Y-m-d H:i:s");
-
-// Fetch token data without expiry check in SQL
-$stmt = $conn->prepare("SELECT email, expires_at FROM password_resets WHERE token = ?");
+$token = trim($_GET['token'] ?? '');
+$stmt = $conn->prepare("SELECT email FROM password_resets WHERE token = ? AND expires_at > NOW() LIMIT 1");
 $stmt->bind_param("s", $token);
 $stmt->execute();
-$result = $stmt->get_result();
-
-if (!$result || $result->num_rows !== 1) {
-    die("Invalid token.");
-}
-
-$row = $result->fetch_assoc();
-
-// Check expiry using PHP time
-if ($row['expires_at'] < $current_php_time) {
-    die("Token expired.");
-}
-
-$email = $row['email'];
+$reset = $stmt->get_result()->fetch_assoc();
+$stmt->close();
 
 $error = "";
 $success = "";
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
+if (!$reset) {
+    http_response_code(410);
+    $error = "This reset link is invalid or expired. Request a new one.";
+} elseif ($_SERVER["REQUEST_METHOD"] === "POST") {
     $password = $_POST['password'] ?? '';
     $confirm_password = $_POST['confirm_password'] ?? '';
 
-    if (strlen($password) < 6) {
-        $error = "Password must be at least 6 characters.";
+    if (strlen($password) < 8) {
+        $error = "Password must be at least 8 characters.";
     } elseif ($password !== $confirm_password) {
         $error = "Passwords do not match.";
     } else {
-        // Hash new password
-        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+        try {
+            $conn->begin_transaction();
+            $lock = $conn->prepare(
+                "SELECT email FROM password_resets WHERE token = ? AND expires_at > NOW() LIMIT 1 FOR UPDATE"
+            );
+            $lock->bind_param("s", $token);
+            $lock->execute();
+            $lockedReset = $lock->get_result()->fetch_assoc();
+            $lock->close();
 
-        // Update user password
-        $updateStmt = $conn->prepare("UPDATE users SET password = ? WHERE email = ?");
-        $updateStmt->bind_param("ss", $hashed_password, $email);
-        $updateStmt->execute();
+            if (!$lockedReset) {
+                $conn->rollback();
+                http_response_code(410);
+                $error = "This reset link is invalid or expired. Request a new one.";
+                $reset = null;
+            } else {
+                $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+                $update = $conn->prepare("UPDATE users SET password = ? WHERE email = ?");
+                $update->bind_param("ss", $hashedPassword, $lockedReset['email']);
+                $update->execute();
+                $updated = $update->affected_rows === 1;
+                $update->close();
 
-        if ($updateStmt->affected_rows === 1) {
-            // Delete used token
-            $delStmt = $conn->prepare("DELETE FROM password_resets WHERE email = ?");
-            $delStmt->bind_param("s", $email);
-            $delStmt->execute();
-
-            $success = "Password reset successful! You can now <a href='role_selection.php'>login</a>.";
-        } else {
-            $error = "Failed to update password. Please try again.";
+                if (!$updated) {
+                    $conn->rollback();
+                    $error = "The account could not be updated. Please request a new reset link.";
+                } else {
+                    $delete = $conn->prepare("DELETE FROM password_resets WHERE token = ?");
+                    $delete->bind_param("s", $token);
+                    $delete->execute();
+                    $delete->close();
+                    $conn->commit();
+                    $success = "Password reset successful! You can now <a href='role_selection.php'>login</a>.";
+                }
+            }
+        } catch (mysqli_sql_exception $exception) {
+            $conn->rollback();
+            error_log('Unable to reset account password: ' . $exception->getMessage());
+            $error = "The password could not be reset. Please try again.";
         }
     }
 }
@@ -71,7 +72,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Reset Password</title>
+<link rel="stylesheet" href="../css/style.css">
 <style>
     body {
         font-family: Arial, sans-serif;
@@ -140,10 +143,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <?php else: ?>
     <form method="POST" autocomplete="off">
         <label>New Password</label><br />
-        <input type="password" name="password" required minlength="6" /><br />
+        <input type="password" name="password" required minlength="8" /><br />
 
         <label>Confirm New Password</label><br />
-        <input type="password" name="confirm_password" required minlength="6" /><br />
+        <input type="password" name="confirm_password" required minlength="8" /><br />
 
         <button type="submit">Reset Password</button>
     </form>

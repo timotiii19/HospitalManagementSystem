@@ -1,10 +1,13 @@
 <?php
-include('../../includes/admin_header.php');
-include('../../includes/admin_sidebar.php');
-include('../../config/db.php');
+session_start();
+require_once('../../config/db.php');
 
-$doctor_id = $_GET['doctor_id'] ?? null;
+if (!isset($_SESSION['UserID'], $_SESSION['role']) || $_SESSION['role'] !== 'Admin') {
+    header('Location: ' . APP_BASE_URL . '/auth/admin_login.php');
+    exit();
+}
 
+$doctor_id = filter_input(INPUT_GET, 'doctor_id', FILTER_VALIDATE_INT);
 if (!$doctor_id) {
     header("Location: doctors.php");
     exit();
@@ -38,7 +41,7 @@ if (isset($_POST['update_doctor'])) {
 
     // Update doctor table (except contact)
     $stmt = $conn->prepare("UPDATE doctor SET Availability=?, DoctorType=?, DepartmentID=?, DoctorFee=? WHERE DoctorID=?");
-    $stmt->bind_param("sssii", $availability, $doctor_type, $department_id, $doctor_fee, $doctor_id);
+    $stmt->bind_param("ssidi", $availability, $doctor_type, $department_id, $doctor_fee, $doctor_id);
     $stmt->execute();
 
     // Update contact in users table
@@ -61,6 +64,9 @@ $locations_result = $conn->query("
     JOIN locations l ON i.LocationID = l.LocationID
     WHERE i.DoctorID = $doctor_id
 ");
+
+include('../../includes/admin_header.php');
+include('../../includes/admin_sidebar.php');
 ?>
 
 <div class="content" style="display: flex; gap: 40px;">

@@ -1,45 +1,23 @@
 <?php
 session_start();
 include('../config/db.php');
+require_once __DIR__ . '/authenticate.php';
 $error = "";
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $email = $_POST['email'];
-    $password = $_POST['password'];
-    // Use prepared statement for security
-    $stmt = $conn->prepare("SELECT * FROM users WHERE email = ? AND role = 'Pharmacist'");
-    $stmt->bind_param("s", $email);
-    $stmt->execute();
-    $result = $stmt->get_result();
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $user = authenticateStaffUser(
+        $conn,
+        $_POST['email'] ?? '',
+        $_POST['password'] ?? '',
+        'Pharmacist'
+    );
 
-    if ($result && $result->num_rows == 1) {
-        $user = $result->fetch_assoc();
-        $passwordMatch = password_verify($password, $user['password']) || $password === $user['password'];
-
-        if ($passwordMatch) {
-            // ✅ Set all needed session values
-            $_SESSION['username'] = $user['username'];
-            $_SESSION['full_name'] = $user['full_name']; // Must be real name
-            $_SESSION['role'] = $user['role'];
-            $_SESSION['UserID'] = $user['UserID'];
-
-            // Get pharmacist-specific role ID
-            $roleStmt = $conn->prepare("SELECT PharmacistID AS role_id FROM pharmacist WHERE UserID = ?");
-            $roleStmt->bind_param("i", $user['UserID']);
-            $roleStmt->execute();
-            $roleResult = $roleStmt->get_result();
-            if ($roleResult && $roleResult->num_rows == 1) {
-                $_SESSION['role_id'] = $roleResult->fetch_assoc()['role_id'];
-            }
-
-            header("Location: ../views/pharmacist/dashboard.php");
-            exit();
-        } else {
-            $error = "Invalid credentials!";
-        }
-    } else {
-        $error = "No Pharmacist found with those credentials!";
+    if ($user) {
+        header('Location: ' . $user['redirect']);
+        exit();
     }
+
+    $error = 'Invalid email or password.';
 }
 ?>
 
@@ -47,7 +25,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pharmacist Login</title>
+    <link rel="stylesheet" href="../css/style.css">
     <style>
         body {
             position: relative;

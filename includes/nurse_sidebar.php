@@ -162,7 +162,7 @@
 
     <ul>
       <li>
-        <a href="/HMS-main/views/nurse/dashboard.php">
+        <a href="<?= APP_BASE_URL ?>/views/nurse/dashboard.php">
           <i class="fa fa-tachometer-alt"></i><span class="label">Dashboard</span>
         </a>
       </li>
@@ -172,37 +172,37 @@
         <i class="fa fa-procedures"></i><span class="label">Patient Management</span>
       </a>
       <ul class="dropdown-content">
-        <li><a href="/HMS-main/views/nurse/add_patient.php"><i class="fa fa-user-plus"></i> Add Patient</a></li>
-        <li><a href="/HMS-main/views/nurse/patient.php"><i class="fa fa-users"></i> View Patients</a></li>
+        <li><a href="<?= APP_BASE_URL ?>/views/nurse/add_patient.php"><i class="fa fa-user-plus"></i> Add Patient</a></li>
+        <li><a href="<?= APP_BASE_URL ?>/views/nurse/patient.php"><i class="fa fa-users"></i> View Patients</a></li>
         <!-- divider line -->
         <li style="text-align:center; color:#fff3;">──────────</li>
-        <li><a href="/HMS-main/views/nurse/inpatient.php"><i class="fa fa-bed"></i> Inpatients</a></li>
-        <li><a href="/HMS-main/views/nurse/outpatient.php"><i class="fa fa-walking"></i> Outpatients</a></li>
+        <li><a href="<?= APP_BASE_URL ?>/views/nurse/inpatient.php"><i class="fa fa-bed"></i> Inpatients</a></li>
+        <li><a href="<?= APP_BASE_URL ?>/views/nurse/outpatient.php"><i class="fa fa-walking"></i> Outpatients</a></li>
       </ul>
     </li>
 
 
       <li>
-        <a href="/HMS-main/views/nurse/department.php">
+        <a href="<?= APP_BASE_URL ?>/views/nurse/department.php">
           <i class="fa fa-building"></i><span class="label">Departments</span>
         </a>
       </li>
       <li>
-        <a href="/HMS-main/views/nurse/doctorschedule.php">
+        <a href="<?= APP_BASE_URL ?>/views/nurse/doctorschedule.php">
           <i class="fa fa-user-clock"></i><span class="label">Doctor Schedule</span>
         </a>
       </li>
       <li>
-        <a href="/HMS-main/views/nurse/location.php">
+        <a href="<?= APP_BASE_URL ?>/views/nurse/location.php">
           <i class="fa fa-map-marker-alt"></i><span class="label">Location</span>
         </a>
       </li>
       <li>
-        <a href="/HMS-main/views/nurse/emergency.php">
+        <a href="<?= APP_BASE_URL ?>/views/nurse/emergency.php">
           <i class="fa fa-ambulance"></i><span class="label">Emergency</span>
         </a>
       </li>
-     <!-- <li><a href="/HMS-main/auth/logout.php"><i class="fa fa-sign-out-alt"></i><span class="label">Logout</span></a></li>-->
+     <!-- <li><a href="<?= APP_BASE_URL ?>/auth/logout.php"><i class="fa fa-sign-out-alt"></i><span class="label">Logout</span></a></li>-->
     </ul>
   </div>
 
@@ -236,6 +236,11 @@
   });
 
   sidebarToggle.addEventListener('click', () => {
+    if (window.matchMedia('(max-width: 680px)').matches) {
+      sidebar.classList.toggle('mobile-open');
+      return;
+    }
+
     sidebar.classList.toggle('collapsed');
     if (sidebar.classList.contains('collapsed')) {
       content.style.marginLeft = '60px';

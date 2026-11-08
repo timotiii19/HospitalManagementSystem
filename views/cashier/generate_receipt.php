@@ -53,7 +53,7 @@ require_once('../../dompdf/vendor/autoload.php');
 use Dompdf\Dompdf;
 
 // Convert the logo image to a data URI
-$logoPath = 'C:/xampp/htdocs/HMS-main/images/hosplogo.png';
+$logoPath = 'C:/xampp/htdocs<?= APP_BASE_URL ?>/images/hosplogo.png';
 $logoData = base64_encode(file_get_contents($logoPath));
 $logoMime = mime_content_type($logoPath);
 $logoURI = 'data:'.$logoMime.';base64,'.$logoData;

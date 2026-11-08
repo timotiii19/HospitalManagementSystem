@@ -4,10 +4,10 @@
     <h2 class="sidebar-title">Pharmacist Dashboard</h2>
   </div>
   <ul>
-    <li><a href="/HMS-main/views/pharmacist/dashboard.php"><i class="fa fa-pills"></i><span class="label">Dashboard</span></a></li>
-    <li><a href="/HMS-main/views/pharmacist/patientmedication.php"><i class="fa fa-notes-medical"></i><span class="label">Patient Medication</span></a></li>
-    <li><a href="/HMS-main/views/pharmacist/pharmacy.php"><i class="fa fa-capsules"></i><span class="label">Pharmacy</span></a></li>
-    <!-- <li><a href="/HMS-main/auth/logout.php"><i class="fa fa-sign-out-alt"></i><span class="label">Logout</span></a></li>-->
+    <li><a href="<?= APP_BASE_URL ?>/views/pharmacist/dashboard.php"><i class="fa fa-pills"></i><span class="label">Dashboard</span></a></li>
+    <li><a href="<?= APP_BASE_URL ?>/views/pharmacist/patientmedication.php"><i class="fa fa-notes-medical"></i><span class="label">Patient Medication</span></a></li>
+    <li><a href="<?= APP_BASE_URL ?>/views/pharmacist/pharmacy.php"><i class="fa fa-capsules"></i><span class="label">Pharmacy</span></a></li>
+    <!-- <li><a href="<?= APP_BASE_URL ?>/auth/logout.php"><i class="fa fa-sign-out-alt"></i><span class="label">Logout</span></a></li>-->
   </ul>
 </div>
 
@@ -118,3 +118,17 @@
     margin-left: 60px;
   }
 </style>
+
+<script>
+  const sidebar = document.getElementById('sidebar');
+  const sidebarToggle = document.getElementById('sidebarToggle');
+
+  sidebarToggle.addEventListener('click', () => {
+    if (window.matchMedia('(max-width: 680px)').matches) {
+      sidebar.classList.toggle('mobile-open');
+      return;
+    }
+
+    sidebar.classList.toggle('collapsed');
+  });
+</script>

@@ -4,9 +4,10 @@ if (!isset($_SESSION['username']) || $_SESSION['role'] != 'Pharmacist') {
     header("Location: ../../auth/pharmacist_login.php");
     exit();
 }
-include('../../includes/pharmacist_sidebar.php');
-include('../../includes/pharmacist_header.php');
+
 include('../../config/db.php');
+include('../../includes/pharmacist_header.php');
+include('../../includes/pharmacist_sidebar.php');
 
 // Get patient list (read-only)
 $patients = $conn->query("SELECT * FROM patients");
